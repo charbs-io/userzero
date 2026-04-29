@@ -1,17 +1,40 @@
 export type RunStatus = 'queued' | 'running' | 'completed' | 'blocked' | 'failed'
 export type IssueSeverity = 'low' | 'medium' | 'high'
 
-export interface VerifiedDomain {
+export interface SiteGithubConnection {
+  site_id: string
+  installation_id: number
+  repository_id: number
+  owner: string
+  repo: string
+  full_name: string
+  html_url: string
+  default_branch: string
+  permissions: Record<string, unknown>
+  use_repository_context: boolean
+  allow_issue_creation: boolean
+  allow_pr_creation: boolean
+  connected_at: string
+  disconnected_at: string | null
+  updated_at: string
+}
+
+export interface Site {
   id: string
+  user_id: string
+  base_url: string
   hostname: string
   verification_method: 'meta' | 'txt' | null
   verified_at: string | null
   last_checked_at: string | null
   created_at: string
+  updated_at: string
+  github_connection: SiteGithubConnection | null
 }
 
 export interface QaRun {
   id: string
+  site_id: string | null
   target_url: string
   target_hostname: string
   persona: string

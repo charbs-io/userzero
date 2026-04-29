@@ -1,11 +1,12 @@
 import { resolveTxt } from 'node:dns/promises'
+import { assertHostnameCovered, assertPublicHostname } from './security'
 
 const metaName = 'userzero-site-verification'
 
-export async function findVerificationToken(hostname: string) {
+export async function findVerificationToken(input: { baseUrl: string, hostname: string }) {
   const [metaToken, txtToken] = await Promise.all([
-    findMetaToken(hostname).catch(() => null),
-    findTxtToken(hostname).catch(() => null)
+    findMetaToken(input.baseUrl, input.hostname).catch(() => null),
+    findTxtToken(input.hostname).catch(() => null)
   ])
 
   if (metaToken) {
@@ -19,11 +20,8 @@ export async function findVerificationToken(hostname: string) {
   return null
 }
 
-async function findMetaToken(hostname: string) {
-  const response = await fetch(`https://${hostname}/`, {
-    signal: AbortSignal.timeout(10000),
-    redirect: 'follow'
-  })
+async function findMetaToken(baseUrl: string, hostname: string) {
+  const response = await fetchSiteHome(baseUrl, hostname)
 
   if (!response.ok) {
     return null
@@ -45,6 +43,48 @@ async function findMetaToken(hostname: string) {
   }
 
   return null
+}
+
+async function fetchSiteHome(baseUrl: string, hostname: string) {
+  let current = new URL(baseUrl)
+  current.pathname = '/'
+  current.search = ''
+  current.hash = ''
+
+  for (let redirectCount = 0; redirectCount < 6; redirectCount++) {
+    assertHostnameCovered(current.hostname, [hostname])
+    await assertPublicHostname(current.hostname)
+
+    const response = await fetch(current.toString(), {
+      signal: AbortSignal.timeout(10000),
+      redirect: 'manual'
+    })
+
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get('location')
+      if (!location) {
+        return response
+      }
+
+      const next = new URL(location, current)
+      if (!['http:', 'https:'].includes(next.protocol)) {
+        return response
+      }
+
+      current = next
+      continue
+    }
+
+    return response
+  }
+
+  assertHostnameCovered(current.hostname, [hostname])
+  await assertPublicHostname(current.hostname)
+
+  return fetch(current.toString(), {
+    signal: AbortSignal.timeout(10000),
+    redirect: 'manual'
+  })
 }
 
 async function findTxtToken(hostname: string) {

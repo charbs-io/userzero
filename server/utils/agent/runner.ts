@@ -5,6 +5,7 @@ import { assertHostnameCovered, assertPublicHostname, normalizeTargetUrl } from 
 import { generateMarkdownReport } from '../report'
 import { decideNextAction } from './openai'
 import type { AgentDecision, ElementInventoryItem } from '../agent-types'
+import type { GithubRepositoryContext } from '../github-context'
 
 type RunCredentials = {
   username?: string
@@ -18,8 +19,9 @@ type StartRunInput = {
   persona: string
   goal: string
   maxSteps: number
-  verifiedDomains: string[]
+  verifiedHostnames: string[]
   credentials: RunCredentials
+  githubContext?: GithubRepositoryContext | null
 }
 
 const activeRuns = new Map<string, Promise<void>>()
@@ -52,7 +54,7 @@ export function startQaRun(input: StartRunInput) {
 async function runQa(input: StartRunInput) {
   const client = createServiceSupabaseClient()
   const target = normalizeTargetUrl(input.targetUrl)
-  assertHostnameCovered(target.hostname, input.verifiedDomains)
+  assertHostnameCovered(target.hostname, input.verifiedHostnames)
   await assertPublicHostname(target.hostname)
 
   await client
@@ -80,7 +82,7 @@ async function runQa(input: StartRunInput) {
 
     for (let stepNumber = 1; stepNumber <= input.maxSteps; stepNumber++) {
       const currentUrl = new URL(page.url())
-      assertHostnameCovered(currentUrl.hostname, input.verifiedDomains)
+      assertHostnameCovered(currentUrl.hostname, input.verifiedHostnames)
       await assertPublicHostname(currentUrl.hostname)
 
       const elements = await collectElementInventory(page)
@@ -94,7 +96,8 @@ async function runQa(input: StartRunInput) {
         history,
         elements,
         screenshot,
-        credentialFields: credentialFields(input.credentials)
+        credentialFields: credentialFields(input.credentials),
+        githubContext: input.githubContext
       })
 
       const actionResult = await executeAction(page, decision, input.credentials)
@@ -293,8 +296,8 @@ async function executeAction(page: Page, decision: AgentDecision, credentials: R
 
     if (action.type === 'navigate') {
       const nextUrl = new URL(action.url)
-      if (!['https:'].includes(nextUrl.protocol)) {
-        throw new Error('Blocked non-HTTPS navigation')
+      if (!['http:', 'https:'].includes(nextUrl.protocol)) {
+        throw new Error('Blocked non-HTTP navigation')
       }
       await page.goto(nextUrl.toString(), { waitUntil: 'domcontentloaded', timeout: 30000 })
       return { ...result, status: 'ok' }

@@ -40,7 +40,7 @@ async function signInWithGitHub() {
             </h1>
           </div>
           <p class="text-sm text-muted">
-            Sign in with GitHub to verify domains and run AI QA journeys.
+            Sign in with GitHub to verify sites and run AI QA journeys.
           </p>
         </div>
 

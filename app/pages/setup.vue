@@ -10,8 +10,8 @@
           icon="i-lucide-shield-check"
           color="primary"
           variant="subtle"
-          title="Domain ownership is required"
-          description="User Zero only tests websites after the signed-in user proves control of the domain with a TXT record or a verification meta tag."
+          title="Site ownership is required"
+          description="User Zero only tests websites after the signed-in user proves control of the site with a TXT record or a verification meta tag."
         />
 
         <UCard>
@@ -22,6 +22,7 @@
           </template>
           <ul class="list-disc space-y-2 pl-5 text-sm text-muted">
             <li>Supabase project with GitHub OAuth enabled.</li>
+            <li>GitHub App configured for repository contents, issues, and pull requests permissions.</li>
             <li>Supabase SQL migration applied and the private screenshot bucket created.</li>
             <li>OpenAI API key configured on the server.</li>
             <li>Railway deployment using the included Playwright Dockerfile.</li>
