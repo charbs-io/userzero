@@ -27,6 +27,13 @@ const links = [[{
     open.value = false
   }
 }, {
+  label: 'PRs',
+  icon: 'i-lucide-git-pull-request',
+  to: '/app/pulls',
+  onSelect: () => {
+    open.value = false
+  }
+}, {
   label: 'Runs',
   icon: 'i-lucide-list-checks',
   to: '/app/runs',

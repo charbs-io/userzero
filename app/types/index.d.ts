@@ -155,3 +155,22 @@ export interface GithubPullRequest {
   closed_at: string | null
   merged_at: string | null
 }
+
+export interface AggregateGithubPullRequest extends GithubPullRequest {
+  site_id: string
+  site_hostname: string
+  repository_full_name: string
+}
+
+export interface GithubPullsFailure {
+  site_id: string
+  site_hostname: string
+  repository_full_name: string
+  message: string
+}
+
+export interface GithubPullsResponse {
+  pulls: AggregateGithubPullRequest[]
+  connection_count: number
+  failures: GithubPullsFailure[]
+}
