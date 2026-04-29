@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { SupabaseClient } from '@supabase/supabase-js'
+
 definePageMeta({
   layout: 'blank'
 })
@@ -33,6 +35,40 @@ const journeys = [{
 
 const activeJourney = ref(0)
 const selectedJourney = computed(() => journeys[activeJourney.value] ?? journeys[0]!)
+const isSignedIn = ref(false)
+let authSubscription: { unsubscribe: () => void } | null = null
+const authButton = computed(() => isSignedIn.value
+  ? {
+      to: '/app',
+      label: 'Go to app',
+      icon: 'i-lucide-layout-dashboard'
+    }
+  : {
+      to: '/login',
+      label: 'Log in',
+      icon: 'i-lucide-log-in'
+    })
+
+onMounted(async () => {
+  const supabase = useNuxtApp().$supabase as SupabaseClient | null
+
+  if (!supabase) {
+    return
+  }
+
+  const { data } = await supabase.auth.getSession()
+  isSignedIn.value = Boolean(data.session)
+
+  const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    isSignedIn.value = Boolean(session)
+  })
+
+  authSubscription = listener.subscription
+})
+
+onBeforeUnmount(() => {
+  authSubscription?.unsubscribe()
+})
 
 const stats = [{
   value: '12 min',
@@ -101,9 +137,9 @@ const faqs = [{
         </nav>
 
         <UButton
-          to="/login"
-          label="Log in"
-          icon="i-lucide-log-in"
+          :to="authButton.to"
+          :label="authButton.label"
+          :icon="authButton.icon"
           color="primary"
         />
       </div>
@@ -130,9 +166,9 @@ const faqs = [{
 
           <div class="mt-8 flex flex-col gap-3 sm:flex-row">
             <UButton
-              to="/login"
-              label="Log in"
-              icon="i-lucide-log-in"
+              :to="authButton.to"
+              :label="authButton.label"
+              :icon="authButton.icon"
               size="xl"
             />
             <UButton
@@ -174,9 +210,9 @@ const faqs = [{
                   </p>
                 </div>
                 <UButton
-                  to="/login"
-                  label="Log in"
-                  icon="i-lucide-log-in"
+                  :to="authButton.to"
+                  :label="authButton.label"
+                  :icon="authButton.icon"
                   size="sm"
                 />
               </div>
@@ -356,9 +392,9 @@ const faqs = [{
           </div>
 
           <UButton
-            to="/login"
-            label="Log in"
-            icon="i-lucide-log-in"
+            :to="authButton.to"
+            :label="authButton.label"
+            :icon="authButton.icon"
             color="primary"
             size="xl"
           />

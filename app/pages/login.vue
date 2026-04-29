@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { DEFAULT_AUTH_REDIRECT, getSafeAuthRedirect } from '#shared/utils/auth-redirect'
+
 definePageMeta({
   layout: 'blank'
 })
@@ -12,11 +14,13 @@ async function signInWithGitHub() {
   loading.value = true
   errorMessage.value = ''
 
-  const redirectTo = `${window.location.origin}/auth/callback`
+  const redirectUrl = new URL('/auth/callback', window.location.origin)
+  redirectUrl.searchParams.set('next', getSafeAuthRedirect(route.query.next, DEFAULT_AUTH_REDIRECT))
+
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'github',
     options: {
-      redirectTo,
+      redirectTo: redirectUrl.toString(),
       scopes: 'read:user user:email'
     }
   })

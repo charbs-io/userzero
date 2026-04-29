@@ -1,10 +1,11 @@
 import { getQuery, sendRedirect } from 'h3'
+import { DEFAULT_AUTH_REDIRECT, getSafeAuthRedirect } from '#shared/utils/auth-redirect'
 import { createEventSupabaseClient, createServiceSupabaseClient, ensureProfile } from '../../utils/supabase'
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const code = typeof query.code === 'string' ? query.code : null
-  const next = typeof query.next === 'string' && query.next.startsWith('/') ? query.next : '/'
+  const next = getSafeAuthRedirect(query.next, DEFAULT_AUTH_REDIRECT)
 
   if (!code) {
     return sendRedirect(event, '/login?error=Missing%20OAuth%20code')
