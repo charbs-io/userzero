@@ -415,5 +415,6 @@ function encodePath(path: string) {
 }
 
 function safeOpenAIFileName(path: string) {
-  return path.replace(/[^a-zA-Z0-9._-]/g, '__').slice(-120) || 'repository-file.txt'
+  const safeName = path.replace(/[^a-zA-Z0-9._-]/g, '__').slice(-116) || 'repository-file'
+  return `${safeName}.txt`
 }
