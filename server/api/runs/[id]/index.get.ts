@@ -1,6 +1,5 @@
 import { createError, getRouterParam } from 'h3'
 import { createServiceSupabaseClient, requireUser } from '../../../utils/supabase'
-import { getSiteGithubConnection } from '../../../utils/sites'
 
 export default defineEventHandler(async (event) => {
   const user = await requireUser(event)
@@ -51,18 +50,32 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: issuesError.message })
   }
 
-  const githubConnection = run.site_id
-    ? await getSiteGithubConnection(client, user.id, run.site_id).catch(() => null)
-    : null
+  const github = run.site_id ? await loadRunGithubState(client, user.id, run.site_id) : null
 
   return {
     run: withVideoUrl(run),
     personas: (personas || []).map(persona => withVideoUrl(persona)),
     steps: (steps || []).map(step => withScreenshotUrl(step)),
     issues: (issues || []).map(issue => withScreenshotUrl(issue)),
-    githubConnection: githubConnection && !githubConnection.disconnected_at ? githubConnection : null
+    github
   }
 })
+
+async function loadRunGithubState(client: ReturnType<typeof createServiceSupabaseClient>, userId: string, siteId: string) {
+  const { data, error } = await client
+    .from('site_github_connections')
+    .select('full_name, allow_issue_creation, allow_pr_creation, repository_index_status')
+    .eq('site_id', siteId)
+    .eq('user_id', userId)
+    .is('disconnected_at', null)
+    .maybeSingle()
+
+  if (error || !data) {
+    return null
+  }
+
+  return data
+}
 
 function withVideoUrl<T extends { video_path: string | null }>(row: T) {
   return {

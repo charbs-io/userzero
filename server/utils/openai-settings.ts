@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto'
 import type { H3Event } from 'h3'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createError } from 'h3'
@@ -95,10 +95,20 @@ export async function loadUserOpenAIConfig(client: SupabaseClient, userId: strin
     })
   }
 
+  const apiKey = decryptSecret(row.encrypted_openai_api_key, event)
+
   return {
-    apiKey: decryptSecret(row.encrypted_openai_api_key, event),
+    apiKey,
+    keyFingerprint: fingerprintOpenAIKey(apiKey, event),
     model: getOpenAIModel(event)
   }
+}
+
+export function fingerprintOpenAIKey(apiKey: string, event?: H3Event) {
+  return createHmac('sha256', getEncryptionKey(event))
+    .update(apiKey)
+    .digest('hex')
+    .slice(0, 32)
 }
 
 function encryptSecret(secret: string, event?: H3Event) {

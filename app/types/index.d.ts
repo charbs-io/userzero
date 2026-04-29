@@ -29,6 +29,13 @@ export interface SiteGithubConnection {
   use_repository_context: boolean
   allow_issue_creation: boolean
   allow_pr_creation: boolean
+  repository_index_status: 'not_indexed' | 'indexing' | 'ready' | 'failed'
+  repository_indexed_branch: string | null
+  repository_indexed_sha: string | null
+  repository_index_started_at: string | null
+  repository_indexed_at: string | null
+  repository_index_error: string | null
+  repository_index_file_count: number
   connected_at: string
   disconnected_at: string | null
   updated_at: string
@@ -122,10 +129,29 @@ export interface QaIssue {
   suggested_fix: string
   screenshot_path: string | null
   screenshot_url?: string | null
-  github_issue_url: string | null
   github_issue_number: number | null
-  github_pr_url: string | null
+  github_issue_url: string | null
+  github_issue_created_at: string | null
   github_pr_number: number | null
-  github_branch: string | null
+  github_pr_url: string | null
+  github_pr_branch: string | null
+  github_pr_created_at: string | null
   created_at: string
+}
+
+export interface GithubPullRequest {
+  number: number
+  title: string
+  state: 'open' | 'closed'
+  draft: boolean
+  html_url: string
+  body: string | null
+  user_login: string
+  head_ref: string
+  head_sha: string
+  base_ref: string
+  created_at: string
+  updated_at: string
+  closed_at: string | null
+  merged_at: string | null
 }

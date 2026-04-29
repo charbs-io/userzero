@@ -26,6 +26,7 @@ const repositoriesPending = ref(false)
 const connecting = ref(false)
 const saving = ref(false)
 const disconnecting = ref(false)
+const reindexing = ref(false)
 const selectedRepositoryId = ref<number | null>(null)
 const settings = reactive({
   useRepositoryContext: true,
@@ -134,6 +135,33 @@ async function disconnectGithub() {
   }
 }
 
+async function reindexRepository() {
+  reindexing.value = true
+
+  try {
+    await $fetch(`/api/sites/${siteId.value}/github/reindex`, { method: 'POST' })
+    await refresh()
+    toast.add({ title: 'Repository indexing started', color: 'success' })
+  } catch (error: unknown) {
+    toast.add({ title: 'Could not start indexing', description: getErrorMessage(error), color: 'error' })
+  } finally {
+    reindexing.value = false
+  }
+}
+
+function indexColor(status?: string) {
+  switch (status) {
+    case 'ready':
+      return 'success'
+    case 'indexing':
+      return 'info'
+    case 'failed':
+      return 'error'
+    default:
+      return 'neutral'
+  }
+}
+
 function getErrorMessage(error: unknown) {
   const fetchError = error as { data?: { message?: string }, message?: string }
   return fetchError.data?.message || fetchError.message || 'Unexpected error'
@@ -195,6 +223,20 @@ function getErrorMessage(error: unknown) {
                   aria-label="Open repository"
                 />
               </div>
+              <div class="mt-3 flex flex-wrap items-center gap-2">
+                <UBadge :color="indexColor(activeConnection.repository_index_status)" variant="subtle">
+                  {{ activeConnection.repository_index_status }}
+                </UBadge>
+                <span class="text-xs text-muted">
+                  {{ activeConnection.repository_index_file_count }} indexed files
+                </span>
+                <span v-if="activeConnection.repository_indexed_at" class="text-xs text-muted">
+                  Indexed {{ new Date(activeConnection.repository_indexed_at).toLocaleString() }}
+                </span>
+              </div>
+              <p v-if="activeConnection.repository_index_error" class="mt-2 text-xs text-error">
+                {{ activeConnection.repository_index_error }}
+              </p>
             </div>
 
             <div v-if="installationId" class="space-y-2">
@@ -232,6 +274,15 @@ function getErrorMessage(error: unknown) {
                 @click="saveConnection"
               />
               <UButton
+                v-if="activeConnection && settings.useRepositoryContext"
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-refresh-cw"
+                label="Reindex"
+                :loading="reindexing || activeConnection.repository_index_status === 'indexing'"
+                @click="reindexRepository"
+              />
+              <UButton
                 v-if="activeConnection"
                 color="error"
                 variant="outline"
@@ -250,30 +301,32 @@ function getErrorMessage(error: unknown) {
             color="primary"
             variant="subtle"
             title="Context used by runs"
-            description="Runs can include repository metadata, README excerpts, package hints, and a capped route/file list. Installation tokens are short-lived and never stored."
+            description="Runs use OpenAI file search against the indexed repository when context is enabled and the index is ready. Installation tokens are short-lived and never stored."
           />
 
           <UCard>
             <template #header>
               <h2 class="text-base font-semibold">
-                Report actions
+                GitHub actions
               </h2>
             </template>
             <div class="space-y-3">
               <UButton
                 icon="i-lucide-circle-dot"
-                label="Create GitHub issue from finding"
-                :disabled="!settings.allowIssueCreation"
+                label="Create issues from run findings"
+                :disabled="!activeConnection?.allow_issue_creation"
+                to="/app/runs"
                 block
               />
               <UButton
                 icon="i-lucide-git-pull-request"
-                label="Create autofix pull request"
-                :disabled="!settings.allowPrCreation"
+                label="View pull requests"
+                :to="`/app/sites/${siteId}/pulls`"
+                :disabled="!activeConnection"
                 block
               />
               <p class="text-sm text-muted">
-                Enabled actions appear on run findings after a report is generated.
+                Issue and pull request creation runs from individual findings on a completed run.
               </p>
             </div>
           </UCard>

@@ -6,6 +6,7 @@ import { loadUserOpenAIConfig } from '../../utils/openai-settings'
 import { startQaRun } from '../../utils/agent/runner'
 import { loadGithubRepositoryContext } from '../../utils/github-context'
 import { loadPersonaTemplatesById } from '../../utils/personas'
+import { loadReadyRepositoryVectorStore } from '../../utils/github-index'
 
 const schema = z.object({
   siteId: z.string().uuid(),
@@ -44,7 +45,6 @@ export default defineEventHandler(async (event) => {
   const verifiedHostnames = [site.hostname]
   assertHostnameCovered(target.hostname, verifiedHostnames)
   await assertPublicHostname(target.hostname)
-  const githubContext = await loadGithubRepositoryContext(client, user.id, site.id).catch(() => null)
   const openai = await loadUserOpenAIConfig(client, user.id, event)
   const templates = body.personaTemplateIds?.length
     ? await loadPersonaTemplatesById(client, user.id, body.personaTemplateIds)
@@ -68,6 +68,10 @@ export default defineEventHandler(async (event) => {
         report_focus: ['Bugs, friction, blockers, and suggested fixes'],
         goal: body.goal
       }]
+  const [githubContext, repositoryVectorStoreId] = await Promise.all([
+    loadGithubRepositoryContext(client, user.id, site.id).catch(() => null),
+    loadReadyRepositoryVectorStore(client, user.id, site.id, openai.apiKey, event)
+  ])
 
   const { data: run, error } = await client
     .from('qa_runs')
@@ -121,6 +125,7 @@ export default defineEventHandler(async (event) => {
     })),
     verifiedHostnames,
     githubContext,
+    repositoryVectorStoreId,
     credentials: {
       username: body.credentials?.username,
       password: body.credentials?.password

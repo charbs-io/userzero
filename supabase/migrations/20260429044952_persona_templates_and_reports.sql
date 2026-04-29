@@ -176,12 +176,7 @@ alter table public.qa_steps
   add column if not exists persona_run_id uuid references public.qa_run_personas(id) on delete cascade;
 
 alter table public.qa_issues
-  add column if not exists persona_run_id uuid references public.qa_run_personas(id) on delete cascade,
-  add column if not exists github_issue_url text,
-  add column if not exists github_issue_number integer,
-  add column if not exists github_pr_url text,
-  add column if not exists github_pr_number integer,
-  add column if not exists github_branch text;
+  add column if not exists persona_run_id uuid references public.qa_run_personas(id) on delete cascade;
 
 create index if not exists qa_steps_persona_run_id_step_number_idx
   on public.qa_steps(persona_run_id, step_number);

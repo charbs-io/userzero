@@ -3,6 +3,7 @@ import { createError, getRouterParam, readValidatedBody } from 'h3'
 import { createServiceSupabaseClient, requireUser } from '../../../../utils/supabase'
 import { createInstallationAccessToken, githubInstallationRequest, type GithubRepository } from '../../../../utils/github-app'
 import { getUserSite } from '../../../../utils/sites'
+import { startGithubRepositoryIndex } from '../../../../utils/github-index'
 
 const schema = z.object({
   installationId: z.number().int().positive(),
@@ -56,15 +57,22 @@ export default defineEventHandler(async (event) => {
       use_repository_context: body.useRepositoryContext,
       allow_issue_creation: body.allowIssueCreation,
       allow_pr_creation: body.allowPrCreation,
+      repository_index_status: body.useRepositoryContext ? 'indexing' : 'not_indexed',
+      repository_index_error: null,
+      repository_index_file_count: 0,
       connected_at: now,
       disconnected_at: null,
       updated_at: now
     }, { onConflict: 'site_id' })
-    .select('site_id, installation_id, repository_id, owner, repo, full_name, html_url, default_branch, permissions, use_repository_context, allow_issue_creation, allow_pr_creation, connected_at, disconnected_at, updated_at')
+    .select('site_id, installation_id, repository_id, owner, repo, full_name, html_url, default_branch, permissions, use_repository_context, allow_issue_creation, allow_pr_creation, repository_index_status, repository_indexed_branch, repository_indexed_sha, repository_index_started_at, repository_indexed_at, repository_index_error, repository_index_file_count, connected_at, disconnected_at, updated_at')
     .single()
 
   if (error) {
     throw createError({ statusCode: 500, statusMessage: error.message })
+  }
+
+  if (body.useRepositoryContext) {
+    startGithubRepositoryIndex({ siteId: id, userId: user.id })
   }
 
   return data

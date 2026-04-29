@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import type { QaIssue, QaRun, QaRunPersona, QaStep, SiteGithubConnection } from '~/types'
+import type { QaIssue, QaRun, QaRunPersona, QaStep } from '~/types'
 
 const route = useRoute()
 const toast = useToast()
 const stopPending = ref(false)
-const issueActionKey = ref<string | null>(null)
 const selectedPersonaId = ref('all')
+const creatingIssueId = ref<string | null>(null)
+const creatingPrId = ref<string | null>(null)
 const selectedScreenshot = ref<{ src: string, title: string, alt: string } | null>(null)
 
 const { data, refresh, pending } = await useFetch<{
@@ -13,9 +14,14 @@ const { data, refresh, pending } = await useFetch<{
   personas: QaRunPersona[]
   steps: QaStep[]
   issues: QaIssue[]
-  githubConnection: SiteGithubConnection | null
+  github: {
+    full_name: string
+    allow_issue_creation: boolean
+    allow_pr_creation: boolean
+    repository_index_status: string
+  } | null
 }>(() => `/api/runs/${route.params.id}`, {
-  default: () => ({ run: null as unknown as QaRun, personas: [], steps: [], issues: [], githubConnection: null })
+  default: () => ({ run: null as unknown as QaRun, personas: [], steps: [], issues: [], github: null })
 })
 
 const terminal = computed(() => ['completed', 'blocked', 'failed', 'cancelled'].includes(data.value.run?.status))
@@ -72,53 +78,15 @@ function issuePersonaName(issue: QaIssue) {
 }
 
 function canCreateGithubIssue(issue: QaIssue) {
-  const connection = data.value.githubConnection
-  return Boolean(connection && connection.allow_issue_creation && !issue.github_issue_url)
+  return Boolean(data.value.github?.allow_issue_creation && !issue.github_issue_url)
 }
 
-function canCreateGithubFix(issue: QaIssue) {
-  const connection = data.value.githubConnection
-  return Boolean(connection && connection.allow_pr_creation && !issue.github_pr_url)
-}
-
-async function createGithubIssue(issue: QaIssue) {
-  if (!canCreateGithubIssue(issue)) {
-    return
-  }
-
-  issueActionKey.value = `${issue.id}:issue`
-
-  try {
-    await $fetch(`/api/runs/${route.params.id}/issues/${issue.id}/github-issue`, {
-      method: 'POST'
-    })
-    await refresh()
-    toast.add({ title: 'GitHub issue created', color: 'success' })
-  } catch (error: unknown) {
-    toast.add({ title: 'Issue could not be created', description: getErrorMessage(error), color: 'error' })
-  } finally {
-    issueActionKey.value = null
-  }
-}
-
-async function createGithubFix(issue: QaIssue) {
-  if (!canCreateGithubFix(issue)) {
-    return
-  }
-
-  issueActionKey.value = `${issue.id}:fix`
-
-  try {
-    await $fetch(`/api/runs/${route.params.id}/issues/${issue.id}/github-fix`, {
-      method: 'POST'
-    })
-    await refresh()
-    toast.add({ title: 'Fix pull request opened', color: 'success' })
-  } catch (error: unknown) {
-    toast.add({ title: 'Fix PR could not be opened', description: getErrorMessage(error), color: 'error' })
-  } finally {
-    issueActionKey.value = null
-  }
+function canCreateGithubPullRequest(issue: QaIssue) {
+  return Boolean(
+    data.value.github?.allow_pr_creation
+    && data.value.github.repository_index_status === 'ready'
+    && !issue.github_pr_url
+  )
 }
 
 function openScreenshot(step: QaStep) {
@@ -150,6 +118,34 @@ async function stopRun() {
     toast.add({ title: 'Run could not be stopped', description: getErrorMessage(error), color: 'error' })
   } finally {
     stopPending.value = false
+  }
+}
+
+async function createGithubIssue(issue: QaIssue) {
+  creatingIssueId.value = issue.id
+
+  try {
+    await $fetch(`/api/issues/${issue.id}/github/issue`, { method: 'POST' })
+    await refresh()
+    toast.add({ title: 'GitHub issue created', color: 'success' })
+  } catch (error: unknown) {
+    toast.add({ title: 'GitHub issue could not be created', description: getErrorMessage(error), color: 'error' })
+  } finally {
+    creatingIssueId.value = null
+  }
+}
+
+async function createGithubPullRequest(issue: QaIssue) {
+  creatingPrId.value = issue.id
+
+  try {
+    await $fetch(`/api/issues/${issue.id}/github/pull-request`, { method: 'POST' })
+    await refresh()
+    toast.add({ title: 'GitHub pull request created', color: 'success' })
+  } catch (error: unknown) {
+    toast.add({ title: 'GitHub pull request could not be created', description: getErrorMessage(error), color: 'error' })
+  } finally {
+    creatingPrId.value = null
   }
 }
 
@@ -361,7 +357,7 @@ function getErrorMessage(error: unknown) {
                     <p class="mt-2 text-sm">
                       {{ issue.suggested_fix }}
                     </p>
-                    <div v-if="data.githubConnection" class="mt-3 flex flex-wrap gap-2">
+                    <div v-if="data.github" class="mt-3 flex flex-wrap gap-2">
                       <UButton
                         v-if="issue.github_issue_url"
                         :to="issue.github_issue_url"
@@ -373,13 +369,14 @@ function getErrorMessage(error: unknown) {
                         label="Open issue"
                       />
                       <UButton
-                        v-else-if="data.githubConnection.allow_issue_creation"
+                        v-else
                         color="neutral"
                         variant="outline"
                         size="sm"
                         icon="i-lucide-circle-dot"
                         label="Create issue"
-                        :loading="issueActionKey === `${issue.id}:issue`"
+                        :loading="creatingIssueId === issue.id"
+                        :disabled="!canCreateGithubIssue(issue)"
                         @click="createGithubIssue(issue)"
                       />
                       <UButton
@@ -393,12 +390,15 @@ function getErrorMessage(error: unknown) {
                         label="Open PR"
                       />
                       <UButton
-                        v-else-if="data.githubConnection.allow_pr_creation"
+                        v-else
+                        color="primary"
+                        variant="outline"
                         size="sm"
                         icon="i-lucide-wrench"
                         label="Fix"
-                        :loading="issueActionKey === `${issue.id}:fix`"
-                        @click="createGithubFix(issue)"
+                        :loading="creatingPrId === issue.id"
+                        :disabled="!canCreateGithubPullRequest(issue)"
+                        @click="createGithubPullRequest(issue)"
                       />
                     </div>
                   </div>
