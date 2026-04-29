@@ -1,7 +1,7 @@
 import { getHeader, getRequestURL, sendRedirect } from 'h3'
 import { createEventSupabaseClient } from '../utils/supabase'
 
-const publicPaths = new Set(['/login'])
+const publicPaths = new Set(['/', '/login'])
 
 export default defineEventHandler(async (event) => {
   if (!isPageRequest(event)) {

@@ -33,12 +33,7 @@ async function signInWithGitHub() {
     <UCard class="w-full max-w-md">
       <div class="space-y-6">
         <div class="space-y-2">
-          <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-ghost" class="size-7 text-primary" />
-            <h1 class="text-xl font-semibold">
-              Product Warden
-            </h1>
-          </div>
+          <AppLogo />
           <p class="text-sm text-muted">
             Sign in with GitHub to verify sites and run AI QA journeys.
           </p>

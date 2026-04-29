@@ -1,4 +1,4 @@
-const publicRoutes = new Set(['/login'])
+const publicRoutes = new Set(['/', '/login'])
 
 export default defineNuxtRouteMiddleware(async (to) => {
   if (publicRoutes.has(to.path) || to.path.startsWith('/auth/callback')) {
