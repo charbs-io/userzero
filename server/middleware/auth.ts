@@ -12,6 +12,14 @@ export default defineEventHandler(async (event) => {
   const url = getRequestURL(event)
   const pathname = url.pathname
 
+  if (pathname === '/' && url.searchParams.has('code')) {
+    const callbackQuery = new URLSearchParams()
+    callbackQuery.set('code', url.searchParams.get('code') || '')
+    callbackQuery.set('next', getSafeAuthRedirect(url.searchParams.get('next'), DEFAULT_AUTH_REDIRECT))
+
+    return sendRedirect(event, `/auth/callback?${callbackQuery.toString()}`, 302)
+  }
+
   if (pathname === '/login') {
     const config = useRuntimeConfig(event)
 

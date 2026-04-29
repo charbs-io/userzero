@@ -26,7 +26,7 @@ useHead({
 })
 
 const title = 'Product Warden'
-const description = 'AI customer simulation and QA reports for verified web products.'
+const description = 'AI-guided browser QA and reviewable reports for verified web products.'
 
 useSeoMeta({
   title,
