@@ -102,7 +102,7 @@ async function runQa(input: StartRunInput, signal: AbortSignal) {
     headless: true
   })
 
-  const videoDir = await mkdtemp(join(tmpdir(), 'userzero-video-'))
+  const videoDir = await mkdtemp(join(tmpdir(), 'productwarden-video-'))
   const context = await browser.newContext({
     viewport: { width: 1440, height: 960 },
     ignoreHTTPSErrors: false,
@@ -326,8 +326,8 @@ async function collectElementInventory(page: Page): Promise<ElementInventoryItem
         }
 
         count += 1
-        const id = `uz-${count}`
-        element.setAttribute('data-userzero-agent-id', id)
+        const id = `pw-${count}`
+        element.setAttribute('data-productwarden-agent-id', id)
 
         const labels = element.id
           ? (Array.from(documentRef.querySelectorAll(`label[for="${cssRef.escape(element.id)}"]`)) as BrowserLabel[]).map(label => label.innerText.trim())
@@ -391,7 +391,7 @@ async function executeAction(page: Page, decision: AgentDecision, credentials: R
     }
 
     const locator = action.target_id
-      ? page.locator(`[data-userzero-agent-id="${action.target_id}"]`).first()
+      ? page.locator(`[data-productwarden-agent-id="${action.target_id}"]`).first()
       : fallbackLocator(page, action.target_description)
 
     if (action.type === 'click') {

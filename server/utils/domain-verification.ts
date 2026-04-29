@@ -1,7 +1,7 @@
 import { resolveTxt } from 'node:dns/promises'
 import { assertHostnameCovered, assertPublicHostname } from './security'
 
-const metaName = 'userzero-site-verification'
+const metaName = 'productwarden-site-verification'
 
 export async function findVerificationToken(input: { baseUrl: string, hostname: string }) {
   const [metaToken, txtToken] = await Promise.all([
@@ -88,7 +88,7 @@ async function fetchSiteHome(baseUrl: string, hostname: string) {
 }
 
 async function findTxtToken(hostname: string) {
-  const records = await resolveTxt(`_userzero.${hostname}`)
+  const records = await resolveTxt(`_productwarden.${hostname}`)
   const flattened = records.map(record => record.join(''))
   const prefix = `${metaName}=`
   const match = flattened.find(value => value.startsWith(prefix))

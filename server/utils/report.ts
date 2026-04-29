@@ -28,8 +28,8 @@ type ReportIssue = {
 export function generateMarkdownReport(run: ReportRun, steps: ReportStep[], issues: ReportIssue[]) {
   const result = run.result || (run.status === 'completed' ? 'completed' : run.status)
   const summary = issues.length
-    ? `User Zero found ${issues.length} issue${issues.length === 1 ? '' : 's'} while attempting the requested journey.`
-    : 'User Zero did not record any issues during this journey.'
+    ? `Product Warden found ${issues.length} issue${issues.length === 1 ? '' : 's'} while attempting the requested journey.`
+    : 'Product Warden did not record any issues during this journey.'
 
   return `# Ghost Customer QA Report
 

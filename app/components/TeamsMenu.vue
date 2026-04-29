@@ -14,6 +14,6 @@ defineProps<{
     class="justify-start data-[state=open]:bg-elevated"
     :class="[!collapsed && 'py-2']"
     icon="i-lucide-ghost"
-    :label="collapsed ? undefined : 'User Zero'"
+    :label="collapsed ? undefined : 'Product Warden'"
   />
 </template>

@@ -35,7 +35,7 @@ const latestRun = computed(() => runs.value[0])
           <div class="grid gap-4 md:grid-cols-[1fr_220px] md:items-center">
             <div class="space-y-2">
               <h2 class="text-base font-semibold">
-                Start with the site you want User Zero to test
+                Start with the site you want Product Warden to test
               </h2>
               <p class="text-sm text-muted">
                 Site setup is required before QA runs because each target must prove ownership.

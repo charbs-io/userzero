@@ -48,11 +48,11 @@ async function verifySite() {
 }
 
 function metaTag(token: string) {
-  return `<meta name="userzero-site-verification" content="${token}">`
+  return `<meta name="productwarden-site-verification" content="${token}">`
 }
 
 function txtRecord(host: string, token: string) {
-  return `_userzero.${host} TXT "userzero-site-verification=${token}"`
+  return `_productwarden.${host} TXT "productwarden-site-verification=${token}"`
 }
 
 function getErrorMessage(error: unknown) {
@@ -77,7 +77,7 @@ function getErrorMessage(error: unknown) {
                   Site URL
                 </h2>
                 <p class="text-sm text-muted">
-                  Enter the public URL exactly as User Zero should start from.
+                  Enter the public URL exactly as Product Warden should start from.
                 </p>
               </div>
             </template>

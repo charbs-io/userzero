@@ -36,7 +36,7 @@ async function signInWithGitHub() {
           <div class="flex items-center gap-2">
             <UIcon name="i-lucide-ghost" class="size-7 text-primary" />
             <h1 class="text-xl font-semibold">
-              User Zero
+              Product Warden
             </h1>
           </div>
           <p class="text-sm text-muted">

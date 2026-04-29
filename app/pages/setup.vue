@@ -75,7 +75,7 @@ function getErrorMessage(error: unknown) {
           color="primary"
           variant="subtle"
           title="Site ownership is required"
-          description="User Zero only tests websites after the signed-in user proves control of the site with a TXT record or a verification meta tag."
+          description="Product Warden only tests websites after the signed-in user proves control of the site with a TXT record or a verification meta tag."
         />
 
         <UCard>

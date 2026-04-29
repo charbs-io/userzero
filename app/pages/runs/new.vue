@@ -87,7 +87,7 @@ function getErrorMessage(error: unknown) {
                 Customer simulation
               </h2>
               <p class="text-sm text-muted">
-                User Zero will visually inspect the site, act through Playwright, and produce a QA report.
+                Product Warden will visually inspect the site, act through Playwright, and produce a QA report.
               </p>
             </div>
           </template>

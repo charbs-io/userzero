@@ -9,7 +9,7 @@ const colorMode = useColorMode()
 const router = useRouter()
 
 const user = ref<{ name: string, avatar?: { src?: string, alt?: string } }>({
-  name: 'User Zero'
+  name: 'Product Warden'
 })
 
 onMounted(async () => {

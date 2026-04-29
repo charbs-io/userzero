@@ -7,7 +7,7 @@ import { createError } from 'h3'
 const blockedHostnames = new Set(['localhost', 'localhost.localdomain'])
 
 export function generateVerificationToken() {
-  return `uzv_${randomBytes(24).toString('base64url')}`
+  return `pwv_${randomBytes(24).toString('base64url')}`
 }
 
 export function hashToken(token: string) {

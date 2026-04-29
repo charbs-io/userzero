@@ -17,7 +17,7 @@ useHead({
   }
 })
 
-const title = 'User Zero'
+const title = 'Product Warden'
 const description = 'AI customer simulation and QA reports for verified web products.'
 
 useSeoMeta({
