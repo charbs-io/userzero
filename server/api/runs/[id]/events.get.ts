@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
 
     event.node.res.write(`data: ${JSON.stringify({ run, step_count: steps?.length || 0 })}\n\n`)
 
-    if (run && ['completed', 'blocked', 'failed'].includes(run.status)) {
+    if (run && ['completed', 'blocked', 'failed', 'cancelled'].includes(run.status)) {
       clearInterval(interval)
       event.node.res.end()
     }

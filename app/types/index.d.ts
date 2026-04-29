@@ -1,4 +1,4 @@
-export type RunStatus = 'queued' | 'running' | 'completed' | 'blocked' | 'failed'
+export type RunStatus = 'queued' | 'running' | 'completed' | 'blocked' | 'failed' | 'cancelled'
 export type IssueSeverity = 'low' | 'medium' | 'high'
 
 export interface VerifiedDomain {

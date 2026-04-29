@@ -2,6 +2,9 @@
 import type { TableColumn } from '@nuxt/ui'
 import type { QaRun } from '~/types'
 
+const toast = useToast()
+const stoppingRunId = ref<string | null>(null)
+
 const { data: runs, refresh, pending } = await useFetch<QaRun[]>('/api/runs', {
   default: () => []
 })
@@ -24,6 +27,50 @@ const columns: TableColumn<QaRun>[] = [{
   id: 'actions',
   header: ''
 }]
+
+function statusColor(status: QaRun['status']) {
+  switch (status) {
+    case 'completed':
+      return 'success'
+    case 'failed':
+      return 'error'
+    case 'blocked':
+      return 'warning'
+    case 'cancelled':
+      return 'neutral'
+    default:
+      return 'info'
+  }
+}
+
+function canStopRun(run: QaRun) {
+  return ['queued', 'running'].includes(run.status)
+}
+
+async function stopRun(run: QaRun) {
+  if (!canStopRun(run)) {
+    return
+  }
+
+  stoppingRunId.value = run.id
+
+  try {
+    await $fetch(`/api/runs/${run.id}/stop`, {
+      method: 'POST'
+    })
+    await refresh()
+    toast.add({ title: 'Run stopped', color: 'success' })
+  } catch (error: unknown) {
+    toast.add({ title: 'Run could not be stopped', description: getErrorMessage(error), color: 'error' })
+  } finally {
+    stoppingRunId.value = null
+  }
+}
+
+function getErrorMessage(error: unknown) {
+  const fetchError = error as { data?: { message?: string }, message?: string }
+  return fetchError.data?.message || fetchError.message || 'Unexpected error'
+}
 </script>
 
 <template>
@@ -46,7 +93,7 @@ const columns: TableColumn<QaRun>[] = [{
         >
           <template #status-cell="{ row }">
             <UBadge
-              :color="row.original.status === 'failed' ? 'error' : row.original.status === 'completed' ? 'success' : row.original.status === 'blocked' ? 'warning' : 'info'"
+              :color="statusColor(row.original.status)"
               variant="subtle"
             >
               {{ row.original.status }}
@@ -58,14 +105,26 @@ const columns: TableColumn<QaRun>[] = [{
           </template>
 
           <template #actions-cell="{ row }">
-            <UButton
-              :to="`/runs/${row.original.id}`"
-              color="neutral"
-              variant="ghost"
-              size="sm"
-              icon="i-lucide-arrow-right"
-              aria-label="Open run"
-            />
+            <div class="flex justify-end gap-1">
+              <UButton
+                v-if="canStopRun(row.original)"
+                color="error"
+                variant="ghost"
+                size="sm"
+                icon="i-lucide-square"
+                aria-label="Stop run"
+                :loading="stoppingRunId === row.original.id"
+                @click="stopRun(row.original)"
+              />
+              <UButton
+                :to="`/runs/${row.original.id}`"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                icon="i-lucide-arrow-right"
+                aria-label="Open run"
+              />
+            </div>
           </template>
         </UTable>
       </UCard>
