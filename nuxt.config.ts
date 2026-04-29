@@ -50,5 +50,13 @@ export default defineNuxtConfig({
         braceStyle: '1tbs'
       }
     }
+  },
+
+  fonts: {
+    provider: 'local',
+    families: [{
+      name: 'Instrument Sans',
+      provider: 'none'
+    }]
   }
 })

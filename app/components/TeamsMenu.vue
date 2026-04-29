@@ -5,15 +5,12 @@ defineProps<{
 </script>
 
 <template>
-  <UButton
+  <NuxtLink
     to="/"
-    color="neutral"
-    variant="ghost"
-    block
-    :square="collapsed"
-    class="justify-start data-[state=open]:bg-elevated"
-    :class="[!collapsed && 'py-2']"
-    icon="i-lucide-ghost"
-    :label="collapsed ? undefined : 'Product Warden'"
-  />
+    class="flex min-h-9 items-center rounded-lg px-2 text-sm hover:bg-elevated"
+    :class="collapsed ? 'justify-center' : 'justify-start py-2'"
+    aria-label="Product Warden home"
+  >
+    <AppLogo :show-text="!collapsed" :compact="collapsed" />
+  </NuxtLink>
 </template>
