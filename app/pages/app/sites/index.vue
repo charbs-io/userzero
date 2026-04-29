@@ -4,7 +4,8 @@ import type { Site } from '~/types'
 
 const route = useRoute()
 const toast = useToast()
-const { data: sites, pending } = await useFetch<Site[]>('/api/sites', {
+const deletingSiteId = ref<string | null>(null)
+const { data: sites, pending, refresh } = await useFetch<Site[]>('/api/sites', {
   default: () => []
 })
 
@@ -34,6 +35,29 @@ const columns: TableColumn<Site>[] = [{
   id: 'actions',
   header: ''
 }]
+
+async function deleteSite(site: Site) {
+  if (!window.confirm(`Delete ${site.hostname}? QA run history will be kept, but it will no longer be attached to this site.`)) {
+    return
+  }
+
+  deletingSiteId.value = site.id
+
+  try {
+    await $fetch(`/api/sites/${site.id}`, { method: 'DELETE' })
+    await refresh()
+    toast.add({ title: 'Site deleted', description: `${site.hostname} was removed.`, color: 'success' })
+  } catch (error: unknown) {
+    toast.add({ title: 'Could not delete site', description: getErrorMessage(error), color: 'error' })
+  } finally {
+    deletingSiteId.value = null
+  }
+}
+
+function getErrorMessage(error: unknown) {
+  const fetchError = error as { data?: { message?: string }, message?: string }
+  return fetchError.data?.message || fetchError.message || 'Unexpected error'
+}
 </script>
 
 <template>
@@ -82,14 +106,26 @@ const columns: TableColumn<Site>[] = [{
           </template>
 
           <template #actions-cell="{ row }">
-            <UButton
-              :to="`/app/sites/${row.original.id}`"
-              color="neutral"
-              variant="ghost"
-              size="sm"
-              icon="i-lucide-arrow-right"
-              aria-label="Open site"
-            />
+            <div class="flex justify-end gap-1">
+              <UButton
+                color="error"
+                variant="ghost"
+                size="sm"
+                icon="i-lucide-trash-2"
+                aria-label="Delete site"
+                :loading="deletingSiteId === row.original.id"
+                :disabled="Boolean(deletingSiteId)"
+                @click="deleteSite(row.original)"
+              />
+              <UButton
+                :to="`/app/sites/${row.original.id}`"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                icon="i-lucide-arrow-right"
+                aria-label="Open site"
+              />
+            </div>
           </template>
         </UTable>
       </UCard>
