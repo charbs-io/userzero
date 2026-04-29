@@ -27,7 +27,7 @@ NUXT_PUBLIC_APP_BASE_URL=http://localhost:3000
 NUXT_PUBLIC_SUPABASE_URL=
 NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-OPENAI_API_KEY=
+API_KEY_ENCRYPTION_SECRET=
 GITHUB_APP_ID=
 GITHUB_APP_PRIVATE_KEY=
 GITHUB_APP_SLUG=
@@ -35,6 +35,8 @@ GITHUB_APP_WEBHOOK_SECRET=
 ```
 
 Apply the Supabase migration in `supabase/migrations`.
+
+OpenAI API keys are saved per user from the Setup page. `API_KEY_ENCRYPTION_SECRET` must be a high-entropy server-only secret of at least 32 characters, for example the output of `openssl rand -base64 32`. Keep this value stable; changing it makes saved API keys undecryptable.
 
 Enable GitHub in Supabase Auth and configure:
 

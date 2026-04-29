@@ -32,6 +32,11 @@ export interface Site {
   github_connection: SiteGithubConnection | null
 }
 
+export interface OpenAISettingsStatus {
+  configured: boolean
+  updated_at: string | null
+}
+
 export interface QaRun {
   id: string
   site_id: string | null
@@ -44,6 +49,8 @@ export interface QaRun {
   result: 'completed' | 'partially_completed' | 'blocked' | null
   error: string | null
   issue_count: number
+  video_path: string | null
+  video_url?: string | null
   report_md: string | null
   created_at: string
   started_at: string | null

@@ -1,4 +1,7 @@
-import { chromium, type Page } from 'playwright'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { chromium, type Page, type Video } from 'playwright'
 import { createError } from 'h3'
 import { createServiceSupabaseClient } from '../supabase'
 import { assertHostnameCovered, assertPublicHostname, normalizeTargetUrl } from '../security'
@@ -22,6 +25,10 @@ type StartRunInput = {
   verifiedHostnames: string[]
   credentials: RunCredentials
   githubContext?: GithubRepositoryContext | null
+  openai: {
+    apiKey: string
+    model: string
+  }
 }
 
 const activeRuns = new Map<string, Promise<void>>()
@@ -53,6 +60,7 @@ export function startQaRun(input: StartRunInput) {
 
 async function runQa(input: StartRunInput) {
   const client = createServiceSupabaseClient()
+  const openai = input.openai
   const target = normalizeTargetUrl(input.targetUrl)
   assertHostnameCovered(target.hostname, input.verifiedHostnames)
   await assertPublicHostname(target.hostname)
@@ -67,15 +75,22 @@ async function runQa(input: StartRunInput) {
     headless: true
   })
 
+  const videoDir = await mkdtemp(join(tmpdir(), 'userzero-video-'))
   const context = await browser.newContext({
     viewport: { width: 1440, height: 960 },
     ignoreHTTPSErrors: false,
-    permissions: []
+    permissions: [],
+    recordVideo: {
+      dir: videoDir,
+      size: { width: 960, height: 640 }
+    }
   })
 
   const page = await context.newPage()
+  const video = page.video()
   const history: Array<{ step: number, observation: string, action: Record<string, unknown> }> = []
   let finalStatus: 'completed' | 'blocked' = 'blocked'
+  let videoPath: string | null = null
 
   try {
     await page.goto(target.toString(), { waitUntil: 'domcontentloaded', timeout: 30000 })
@@ -97,7 +112,8 @@ async function runQa(input: StartRunInput) {
         elements,
         screenshot,
         credentialFields: credentialFields(input.credentials),
-        githubContext: input.githubContext
+        githubContext: input.githubContext,
+        openai
       })
 
       const actionResult = await executeAction(page, decision, input.credentials)
@@ -137,7 +153,13 @@ async function runQa(input: StartRunInput) {
       }
     }
   } finally {
+    await context.close().catch(() => undefined)
+    videoPath = await uploadRunVideo(client, input.runId, video).catch(() => null)
+    if (videoPath) {
+      await saveRunVideoPath(client, input.runId, input.userId, videoPath).catch(() => undefined)
+    }
     await browser.close()
+    await rm(videoDir, { recursive: true, force: true }).catch(() => undefined)
   }
 
   const { data: run } = await client
@@ -173,6 +195,7 @@ async function runQa(input: StartRunInput) {
       status: finalStatus === 'completed' ? 'completed' : 'blocked',
       result: finalStatus,
       issue_count: issues?.length || 0,
+      video_path: videoPath,
       report_md: report,
       completed_at: new Date().toISOString()
     })
@@ -348,6 +371,36 @@ async function uploadScreenshot(client: ReturnType<typeof createServiceSupabaseC
   }
 
   return path
+}
+
+async function uploadRunVideo(client: ReturnType<typeof createServiceSupabaseClient>, runId: string, video: Video | null) {
+  if (!video) {
+    return null
+  }
+
+  const config = useRuntimeConfig()
+  const bucket = config.screenshotBucket || process.env.SCREENSHOT_BUCKET || 'qa-screenshots'
+  const sourcePath = await video.path()
+  const file = await readFile(sourcePath)
+  const path = `${runId}/run.webm`
+  const { error } = await client.storage.from(bucket).upload(path, file, {
+    contentType: 'video/webm',
+    upsert: true
+  })
+
+  if (error) {
+    return null
+  }
+
+  return path
+}
+
+async function saveRunVideoPath(client: ReturnType<typeof createServiceSupabaseClient>, runId: string, userId: string, videoPath: string) {
+  await client
+    .from('qa_runs')
+    .update({ video_path: videoPath })
+    .eq('id', runId)
+    .eq('user_id', userId)
 }
 
 async function insertStep(client: ReturnType<typeof createServiceSupabaseClient>, input: {

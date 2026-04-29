@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { createError, readValidatedBody } from 'h3'
 import { createServiceSupabaseClient, requireUser } from '../../utils/supabase'
 import { assertHostnameCovered, assertPublicHostname, normalizeTargetUrl } from '../../utils/security'
+import { loadUserOpenAIConfig } from '../../utils/openai-settings'
 import { startQaRun } from '../../utils/agent/runner'
 import { loadGithubRepositoryContext } from '../../utils/github-context'
 
@@ -42,6 +43,7 @@ export default defineEventHandler(async (event) => {
   assertHostnameCovered(target.hostname, verifiedHostnames)
   await assertPublicHostname(target.hostname)
   const githubContext = await loadGithubRepositoryContext(client, user.id, site.id).catch(() => null)
+  const openai = await loadUserOpenAIConfig(client, user.id, event)
 
   const { data: run, error } = await client
     .from('qa_runs')
@@ -74,7 +76,8 @@ export default defineEventHandler(async (event) => {
     credentials: {
       username: body.credentials?.username,
       password: body.credentials?.password
-    }
+    },
+    openai
   })
 
   return run
