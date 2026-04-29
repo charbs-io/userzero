@@ -40,11 +40,18 @@ export default defineEventHandler(async (event) => {
   }
 
   return {
-    run,
+    run: withVideoUrl(run),
     steps: (steps || []).map(step => withScreenshotUrl(step)),
     issues: (issues || []).map(issue => withScreenshotUrl(issue))
   }
 })
+
+function withVideoUrl<T extends { video_path: string | null }>(row: T) {
+  return {
+    ...row,
+    video_url: row.video_path ? `/api/videos/${row.video_path}` : null
+  }
+}
 
 function withScreenshotUrl<T extends { screenshot_path: string | null }>(row: T) {
   return {

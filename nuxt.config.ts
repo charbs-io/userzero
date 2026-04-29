@@ -14,7 +14,7 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     supabaseServiceRoleKey: '',
-    openaiApiKey: '',
+    apiKeyEncryptionSecret: '',
     openaiModel: 'gpt-5.4-mini',
     openaiReportModel: 'gpt-5.5',
     screenshotBucket: 'qa-screenshots',

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { createError, readValidatedBody } from 'h3'
 import { createServiceSupabaseClient, requireUser } from '../../utils/supabase'
 import { assertHostnameCovered, assertPublicHostname, normalizeTargetUrl } from '../../utils/security'
+import { loadUserOpenAIConfig } from '../../utils/openai-settings'
 import { startQaRun } from '../../utils/agent/runner'
 
 const schema = z.object({
@@ -34,6 +35,7 @@ export default defineEventHandler(async (event) => {
   const verifiedDomains = (domains || []).map(domain => domain.hostname)
   assertHostnameCovered(target.hostname, verifiedDomains)
   await assertPublicHostname(target.hostname)
+  const openai = await loadUserOpenAIConfig(client, user.id, event)
 
   const { data: run, error } = await client
     .from('qa_runs')
@@ -64,7 +66,8 @@ export default defineEventHandler(async (event) => {
     credentials: {
       username: body.credentials?.username,
       password: body.credentials?.password
-    }
+    },
+    openai
   })
 
   return run

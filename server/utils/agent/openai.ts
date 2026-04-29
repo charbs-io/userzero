@@ -1,5 +1,4 @@
 import OpenAI from 'openai'
-import { createError } from 'h3'
 import { agentDecisionSchema, type AgentDecision, type ElementInventoryItem } from '../agent-types'
 
 type DecideInput = {
@@ -11,22 +10,18 @@ type DecideInput = {
   elements: ElementInventoryItem[]
   screenshot: Buffer
   credentialFields: string[]
+  openai: {
+    apiKey: string
+    model: string
+  }
 }
 
 export async function decideNextAction(input: DecideInput): Promise<AgentDecision> {
-  const config = useRuntimeConfig()
-  const apiKey = config.openaiApiKey || process.env.OPENAI_API_KEY
-  const model = config.openaiModel || process.env.OPENAI_MODEL || 'gpt-5.4-mini'
-
-  if (!apiKey) {
-    throw createError({ statusCode: 500, statusMessage: 'OPENAI_API_KEY is not configured' })
-  }
-
-  const client = new OpenAI({ apiKey })
+  const client = new OpenAI({ apiKey: input.openai.apiKey })
   const screenshotDataUrl = `data:image/png;base64,${input.screenshot.toString('base64')}`
 
   const response = await client.responses.create({
-    model,
+    model: input.openai.model,
     instructions: [
       'You are Ghost Customer, an AI QA/customer-simulation agent.',
       'Use the screenshot and element inventory to choose the next Playwright action toward the user goal.',

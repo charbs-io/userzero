@@ -208,6 +208,21 @@ function getErrorMessage(error: unknown) {
             </UCard>
 
             <div class="space-y-4">
+              <UCard v-if="data.run.video_url">
+                <template #header>
+                  <h2 class="text-base font-semibold">
+                    Run video
+                  </h2>
+                </template>
+
+                <video
+                  :src="data.run.video_url"
+                  controls
+                  preload="metadata"
+                  class="aspect-video w-full rounded-md border border-default bg-black"
+                />
+              </UCard>
+
               <UCard>
                 <template #header>
                   <h2 class="text-base font-semibold">

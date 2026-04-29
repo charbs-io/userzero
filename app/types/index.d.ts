@@ -10,6 +10,11 @@ export interface VerifiedDomain {
   created_at: string
 }
 
+export interface OpenAISettingsStatus {
+  configured: boolean
+  updated_at: string | null
+}
+
 export interface QaRun {
   id: string
   target_url: string
@@ -21,6 +26,8 @@ export interface QaRun {
   result: 'completed' | 'partially_completed' | 'blocked' | null
   error: string | null
   issue_count: number
+  video_path: string | null
+  video_url?: string | null
   report_md: string | null
   created_at: string
   started_at: string | null
