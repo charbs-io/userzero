@@ -6,35 +6,38 @@ definePageMeta({
 })
 
 useSeoMeta({
-  title: 'Product Warden | AI QA agents for web products',
-  description: 'Product Warden sends AI customers through verified websites and returns QA reports with screenshots, issues and code context.'
+  title: 'Product Warden | AI browser QA for verified web apps',
+  description: 'Run AI-guided browser checks against verified websites and review screenshots, step traces, issues and markdown reports.'
 })
 
-const journeys = [{
-  name: 'Checkout',
-  icon: 'i-lucide-shopping-cart',
-  risk: 'Low risk',
-  score: '94',
-  summary: 'Recovered pricing, cart and payment friction before release.',
-  events: ['Product detail loaded', 'Cart accepted variant', 'Payment copy verified']
+const auditModes = [{
+  name: 'Customer',
+  icon: 'i-lucide-user-round',
+  focus: 'Experience and conversion friction',
+  summary: 'Acts through the requested journey with normal user expectations and records visible confusion, dead ends and blockers.',
+  records: ['Journey clarity and trust gaps', 'Conversion blockers', 'Plain-language evidence']
 }, {
-  name: 'Signup',
-  icon: 'i-lucide-user-plus',
-  risk: 'Needs review',
-  score: '78',
-  summary: 'Found a blocked onboarding path after email confirmation.',
-  events: ['Account created', 'Redirect inspected', 'Empty-state issue captured']
+  name: 'QA engineer',
+  icon: 'i-lucide-bug',
+  focus: 'Functional defects and regressions',
+  summary: 'Exercises forms, navigation, state changes and error states, then records reproducible issues with suggested fixes.',
+  records: ['Broken UI behavior', 'Validation gaps', 'Regression risk']
 }, {
-  name: 'Dashboard',
-  icon: 'i-lucide-layout-dashboard',
-  risk: 'Healthy',
-  score: '91',
-  summary: 'Confirmed authenticated navigation and key account actions.',
-  events: ['Session restored', 'Primary action tested', 'Report evidence saved']
+  name: 'Performance engineer',
+  icon: 'i-lucide-gauge',
+  focus: 'Load timing and runtime noise',
+  summary: 'Uses browser diagnostics during the journey to surface slow requests, page errors and console noise where available.',
+  records: ['Page-load timing', 'Slow network requests', 'Console and page errors']
+}, {
+  name: 'Security engineer',
+  icon: 'i-lucide-shield-alert',
+  focus: 'Visible security and privacy risks',
+  summary: 'Looks for auth, permission, mixed-content and privacy issues from the browser journey without intrusive testing.',
+  records: ['Visible privacy leaks', 'Auth and permission mistakes', 'Severity and remediation notes']
 }]
 
-const activeJourney = ref(0)
-const selectedJourney = computed(() => journeys[activeJourney.value] ?? journeys[0]!)
+const activeMode = ref(0)
+const selectedMode = computed(() => auditModes[activeMode.value] ?? auditModes[0]!)
 const isSignedIn = ref(false)
 let authSubscription: { unsubscribe: () => void } | null = null
 const authButton = computed(() => isSignedIn.value
@@ -70,55 +73,64 @@ onBeforeUnmount(() => {
   authSubscription?.unsubscribe()
 })
 
-const stats = [{
-  value: '12 min',
-  label: 'from prompt to report'
+const productFacts = [{
+  value: 'Verified sites',
+  label: 'runs start only on hostnames you prove you control'
 }, {
-  value: '3x',
-  label: 'more paths checked per release'
+  value: 'Browser evidence',
+  label: 'screenshots, step traces, issues and report output'
 }, {
-  value: '0',
-  label: 'scripts to maintain'
+  value: 'Optional GitHub',
+  label: 'repository context, issues and pull requests when enabled'
 }]
 
 const features = [{
-  title: 'Customer-like agents',
-  description: 'Ask Product Warden to buy, sign up, compare, subscribe or recover an account just like a real customer would.',
-  icon: 'i-lucide-bot'
-}, {
-  title: 'Evidence-rich reports',
-  description: 'Each run keeps screenshots, step notes and issue summaries together so the next fix is obvious.',
-  icon: 'i-lucide-file-search'
-}, {
-  title: 'Verified targets',
-  description: 'Sites must prove ownership before runs start, keeping QA focused on products you actually control.',
+  title: 'Verified-site runs',
+  description: 'Product Warden blocks runs unless the target hostname is covered by a site you have verified with a meta tag or DNS record.',
   icon: 'i-lucide-shield-check'
 }, {
-  title: 'GitHub context',
-  description: 'Connect a repository so findings can point back to the product surface and the code behind it.',
+  title: 'Browser-driven journeys',
+  description: 'A Playwright browser opens the target URL, inspects visible controls and works through the goal with the selected persona.',
+  icon: 'i-lucide-mouse-pointer-click'
+}, {
+  title: 'Inspectable evidence',
+  description: 'Runs store screenshots, action history, issue records, markdown reports and videos when available, so findings can be reviewed instead of taken on faith.',
+  icon: 'i-lucide-file-search'
+}, {
+  title: 'Opt-in GitHub actions',
+  description: 'When a repository is connected, indexed and allowed, findings can use repository context and create GitHub issues or pull requests.',
   icon: 'i-simple-icons-github'
 }]
 
 const steps = [{
-  title: 'Add a site',
-  description: 'Register the product URL and verify ownership before any agent run begins.'
+  title: 'Verify a site',
+  description: 'Add the public URL and prove ownership before Product Warden can start a run.'
 }, {
-  title: 'Describe the journey',
-  description: 'Tell the agent what a customer is trying to do, from checkout to onboarding.'
+  title: 'Choose personas and a goal',
+  description: 'Select one or more starter or custom personas, then describe the journey in plain language.'
 }, {
-  title: 'Review the report',
-  description: 'Open a concise QA report with screenshots, status, issues and next actions.'
+  title: 'Review the run evidence',
+  description: 'Open the step trace, screenshots, issue list, markdown reports and any recorded video from the completed run.'
+}, {
+  title: 'Act on findings',
+  description: 'Handle issues manually, or enable GitHub actions for issue and pull request creation from individual findings.'
 }]
 
 const faqs = [{
   question: 'Is this replacing automated tests?',
-  answer: 'No. It is a practical layer for exploratory product QA where brittle selectors and narrow assertions miss real customer friction.'
+  answer: 'No. Product Warden is an exploratory QA layer. Keep deterministic tests for known contracts and use this for visible journey checks and product friction.'
 }, {
-  question: 'Why does Product Warden verify sites?',
-  answer: 'Verification keeps runs limited to products the workspace owns or operates, which is the right boundary for autonomous QA.'
+  question: 'What does it actually do during a run?',
+  answer: 'It launches a browser, captures screenshots, inventories visible controls, asks the selected persona what to do next and stores the resulting steps, issues and reports.'
 }, {
-  question: 'What should I run first?',
-  answer: 'Start with the revenue or activation path: checkout, trial signup, account creation, password recovery or the primary dashboard action.'
+  question: 'Are the findings guaranteed?',
+  answer: 'No. AI browser runs can miss things or misjudge severity. The report is reviewable evidence for a human team, not an automatic pass or fail certificate.'
+}, {
+  question: 'Can it test any website?',
+  answer: 'No. The target must be a public HTTP or HTTPS hostname covered by a verified site in your workspace. Runs stop if they leave that boundary.'
+}, {
+  question: 'What does GitHub integration do?',
+  answer: 'Repository context is optional. If connected, indexed and explicitly enabled, it can help runs reason about likely implementation areas and create GitHub issues or pull requests from findings.'
 }]
 </script>
 
@@ -153,15 +165,15 @@ const faqs = [{
             variant="subtle"
             class="w-fit"
           >
-            AI product QA for verified web apps
+            Verified-site browser QA
           </UBadge>
 
           <h1 class="mt-6 max-w-3xl text-4xl font-semibold tracking-normal text-default sm:text-5xl xl:text-6xl">
-            Product Warden catches broken product flows before customers do.
+            Run AI-guided QA on the web flows you own.
           </h1>
 
           <p class="mt-6 max-w-2xl text-lg leading-8 text-muted">
-            Send AI customers through checkout, signup and dashboard journeys. Get a clear report with screenshots, issue notes and the context your team needs to fix the path.
+            Product Warden opens a real browser against a verified URL, works through a goal with selected personas and gives you screenshots, steps, issues and markdown reports to review.
           </p>
 
           <div class="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -173,7 +185,7 @@ const faqs = [{
             />
             <UButton
               to="#features"
-              label="See features"
+              label="See how it works"
               icon="i-lucide-arrow-down"
               color="neutral"
               variant="outline"
@@ -183,30 +195,30 @@ const faqs = [{
 
           <dl class="mt-12 grid max-w-2xl gap-4 sm:grid-cols-3">
             <div
-              v-for="stat in stats"
-              :key="stat.label"
+              v-for="fact in productFacts"
+              :key="fact.value"
               class="rounded-lg border border-default bg-elevated/35 p-4"
             >
-              <dt class="text-sm text-muted">
-                {{ stat.label }}
+              <dt class="text-sm font-semibold text-default">
+                {{ fact.value }}
               </dt>
-              <dd class="mt-2 text-2xl font-semibold text-default">
-                {{ stat.value }}
+              <dd class="mt-2 text-sm leading-6 text-muted">
+                {{ fact.label }}
               </dd>
             </div>
           </dl>
         </div>
 
-        <aside class="relative lg:pt-10" aria-label="Interactive QA report preview">
+        <aside class="relative lg:pt-10" aria-label="Interactive QA evidence preview">
           <div class="rounded-lg border border-default bg-default shadow-2xl shadow-cyan-950/10 dark:shadow-cyan-950/25">
             <div class="border-b border-default p-4">
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <p class="text-sm font-medium text-default">
-                    Live journey run
+                    Run evidence preview
                   </p>
                   <p class="text-xs text-muted">
-                    {{ selectedJourney.name }} path
+                    {{ selectedMode.focus }}
                   </p>
                 </div>
                 <UButton
@@ -217,18 +229,18 @@ const faqs = [{
                 />
               </div>
 
-              <div class="mt-4 grid grid-cols-3 gap-2">
+              <div class="mt-4 grid grid-cols-2 gap-2">
                 <button
-                  v-for="(journey, index) in journeys"
-                  :key="journey.name"
+                  v-for="(mode, index) in auditModes"
+                  :key="mode.name"
                   type="button"
                   class="rounded-lg border px-3 py-2 text-left text-sm transition"
-                  :class="activeJourney === index ? 'border-primary bg-primary/10 text-default' : 'border-default bg-elevated/40 text-muted hover:text-default'"
-                  :aria-pressed="activeJourney === index"
-                  @click="activeJourney = index"
+                  :class="activeMode === index ? 'border-primary bg-primary/10 text-default' : 'border-default bg-elevated/40 text-muted hover:text-default'"
+                  :aria-pressed="activeMode === index"
+                  @click="activeMode = index"
                 >
-                  <UIcon :name="journey.icon" class="mb-2 size-4" />
-                  <span class="block truncate">{{ journey.name }}</span>
+                  <UIcon :name="mode.icon" class="mb-2 size-4" />
+                  <span class="block truncate">{{ mode.name }}</span>
                 </button>
               </div>
             </div>
@@ -237,42 +249,38 @@ const faqs = [{
               <div class="flex items-start justify-between gap-4">
                 <div>
                   <p class="text-sm text-muted">
-                    Warden score
+                    Selected persona
                   </p>
-                  <p class="mt-1 text-5xl font-semibold text-default">
-                    {{ selectedJourney.score }}
+                  <p class="mt-1 text-3xl font-semibold text-default">
+                    {{ selectedMode.name }}
                   </p>
                 </div>
                 <UBadge
-                  :color="selectedJourney.risk === 'Needs review' ? 'warning' : 'success'"
+                  color="neutral"
                   variant="subtle"
                   size="lg"
                 >
-                  {{ selectedJourney.risk }}
+                  Starter template
                 </UBadge>
               </div>
 
-              <div class="h-2 rounded-full bg-elevated">
-                <div
-                  class="h-2 rounded-full bg-primary"
-                  :style="{ width: `${selectedJourney.score}%` }"
-                />
-              </div>
-
               <p class="rounded-lg border border-default bg-elevated/35 p-4 text-sm leading-6 text-muted">
-                {{ selectedJourney.summary }}
+                {{ selectedMode.summary }}
               </p>
 
               <div class="space-y-3">
+                <p class="text-sm font-medium text-default">
+                  Report focus
+                </p>
                 <div
-                  v-for="event in selectedJourney.events"
-                  :key="event"
+                  v-for="record in selectedMode.records"
+                  :key="record"
                   class="flex items-center gap-3 rounded-lg border border-default px-3 py-2"
                 >
                   <span class="inline-grid size-7 shrink-0 place-items-center rounded-full bg-success/10 text-success">
                     <UIcon name="i-lucide-check" class="size-4" />
                   </span>
-                  <span class="text-sm text-default">{{ event }}</span>
+                  <span class="text-sm text-default">{{ record }}</span>
                 </div>
               </div>
             </div>
@@ -285,13 +293,13 @@ const faqs = [{
       <div class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div class="max-w-2xl">
           <p class="text-sm font-medium text-primary">
-            What it does
+            What it actually does
           </p>
           <h2 class="mt-3 text-3xl font-semibold tracking-normal text-default sm:text-4xl">
-            A QA teammate that understands product intent.
+            Browser runs with evidence you can inspect.
           </h2>
           <p class="mt-4 text-base leading-7 text-muted">
-            Product Warden is built for the messy flows that matter most: authenticated pages, buying paths, account setup and release smoke checks.
+            The product is intentionally narrow: verified web targets, visible browser journeys, saved evidence and optional repository context.
           </p>
         </div>
 
@@ -322,10 +330,10 @@ const faqs = [{
             How it works
           </p>
           <h2 class="mt-3 text-3xl font-semibold tracking-normal text-default sm:text-4xl">
-            From a plain-English goal to a usable QA report.
+            From a verified URL to a reviewable report.
           </h2>
           <p class="mt-4 text-base leading-7 text-muted">
-            Keep the workflow close to how teams already ship: pick the product surface, state the customer goal and review the evidence.
+            Start with one journey your team would normally smoke test, then inspect the generated evidence before deciding what to fix.
           </p>
         </div>
 
@@ -355,10 +363,10 @@ const faqs = [{
       <div class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div class="max-w-2xl">
           <p class="text-sm font-medium text-primary">
-            Questions
+            Limits
           </p>
           <h2 class="mt-3 text-3xl font-semibold tracking-normal text-default sm:text-4xl">
-            Built for release checks, not theatre.
+            Useful evidence, not magic QA.
           </h2>
         </div>
 
@@ -384,10 +392,10 @@ const faqs = [{
         <div class="grid gap-8 rounded-lg border border-default bg-neutral-950 p-6 text-white sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center dark:bg-white dark:text-neutral-950">
           <div>
             <h2 class="text-3xl font-semibold tracking-normal">
-              Run the journey your customers care about next.
+              Start with one journey you already care about.
             </h2>
             <p class="mt-3 max-w-2xl text-sm leading-6 text-white/70 dark:text-neutral-700">
-              Log in, verify a site and let Product Warden inspect the path before it reaches production traffic.
+              Log in, verify a site, choose a persona and review the browser evidence before deciding what to fix.
             </p>
           </div>
 
