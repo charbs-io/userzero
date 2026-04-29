@@ -155,7 +155,14 @@ function createGithubAppJwt(event?: H3Event) {
   signer.update(unsigned)
   signer.end()
 
-  return `${unsigned}.${signer.sign(privateKey, 'base64url')}`
+  try {
+    return `${unsigned}.${signer.sign(privateKey, 'base64url')}`
+  } catch {
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'GitHub App private key is invalid. Set GITHUB_APP_PRIVATE_KEY to the full PEM, a single-line PEM with \\n, or a base64-encoded PEM.'
+    })
+  }
 }
 
 function signState(event: H3Event, encodedPayload: string) {
@@ -182,7 +189,35 @@ function getGithubStateSecret(event: H3Event) {
 }
 
 function normalizePrivateKey(value?: string) {
-  return value?.replace(/\\n/g, '\n') || ''
+  let privateKey = stripOuterQuotes(value?.trim() || '').replace(/\\n/g, '\n')
+
+  if (!privateKey) {
+    return ''
+  }
+
+  if (!privateKey.includes('-----BEGIN') && looksBase64(privateKey)) {
+    const decoded = Buffer.from(privateKey.replace(/\s/g, ''), 'base64').toString('utf8').trim()
+    if (decoded.includes('-----BEGIN') && decoded.includes('PRIVATE KEY-----')) {
+      privateKey = decoded.replace(/\\n/g, '\n')
+    }
+  }
+
+  return privateKey
+    .replace(/\r\n/g, '\n')
+    .replace(/-----BEGIN ([A-Z ]+?)-----\s*/, '-----BEGIN $1-----\n')
+    .replace(/\s*-----END ([A-Z ]+?)-----/, '\n-----END $1-----')
+}
+
+function stripOuterQuotes(value: string) {
+  const first = value[0]
+  const last = value[value.length - 1]
+  return value.length >= 2 && (first === '"' || first === '\'') && first === last
+    ? value.slice(1, -1)
+    : value
+}
+
+function looksBase64(value: string) {
+  return /^[A-Za-z0-9+/=\s]+$/.test(value)
 }
 
 function base64UrlEncode(value: string) {
