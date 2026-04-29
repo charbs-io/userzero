@@ -146,7 +146,7 @@ function getErrorMessage(error: unknown) {
           </template>
           <ul class="list-disc space-y-2 pl-5 text-sm text-muted">
             <li>Supabase project with GitHub OAuth enabled.</li>
-            <li>GitHub App configured for repository contents, issues, and pull requests permissions.</li>
+            <li>GitHub App configured for repository contents write, issues write, and pull requests write permissions.</li>
             <li>Supabase SQL migration applied and the private screenshot bucket created.</li>
             <li>Server encryption secret configured for saved OpenAI API keys.</li>
             <li>Railway deployment using the included Playwright Dockerfile.</li>

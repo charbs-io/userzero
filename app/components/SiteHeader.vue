@@ -23,6 +23,11 @@ const items = computed<NavigationMenuItem[][]>(() => [[{
   icon: 'i-simple-icons-github',
   to: `/app/sites/${props.siteId}/github`,
   active: route.path === `/app/sites/${props.siteId}/github`
+}, {
+  label: 'Pull requests',
+  icon: 'i-lucide-git-pull-request',
+  to: `/app/sites/${props.siteId}/pulls`,
+  active: route.path === `/app/sites/${props.siteId}/pulls`
 }]])
 </script>
 

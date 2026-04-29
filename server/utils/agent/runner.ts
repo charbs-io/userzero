@@ -31,6 +31,7 @@ type StartRunInput = {
   verifiedHostnames: string[]
   credentials: RunCredentialInput
   githubContext?: GithubRepositoryContext | null
+  repositoryVectorStoreId?: string | null
   openai: {
     apiKey: string
     model: string
@@ -43,6 +44,15 @@ type ActiveRun = {
 }
 
 const activeRuns = new Map<string, ActiveRun>()
+const INITIAL_CURSOR_POSITION = { x: 72, y: 72 }
+const CURSOR_MOVE_DURATION_MS = 340
+const CURSOR_TARGET_TIMEOUT_MS = 3000
+const VISIBLE_CURSOR_ID = 'productwarden-visible-cursor'
+
+type CursorPoint = {
+  x: number
+  y: number
+}
 
 export function startQaRun(input: StartRunInput) {
   if (activeRuns.has(input.runId)) {
@@ -130,6 +140,7 @@ async function runQa(input: StartRunInput, signal: AbortSignal) {
   }> = []
   let finalStatus: 'completed' | 'blocked' = 'blocked'
   let videoPath: string | null = null
+  let cursorPosition: CursorPoint = INITIAL_CURSOR_POSITION
 
   try {
     await page.goto(target.toString(), { waitUntil: 'domcontentloaded', timeout: 30000 })
@@ -144,6 +155,7 @@ async function runQa(input: StartRunInput, signal: AbortSignal) {
       await assertPublicHostname(currentUrl.hostname)
 
       const elements = await collectElementInventory(page)
+      await ensureVisibleCursor(page, cursorPosition)
       const screenshot = await page.screenshot({ type: 'png', fullPage: false })
       const screenshotPath = await uploadScreenshot(client, input.runId, stepNumber, screenshot)
 
@@ -161,6 +173,7 @@ async function runQa(input: StartRunInput, signal: AbortSignal) {
         screenshot,
         credentialFields: credentialFields(),
         githubContext: input.githubContext,
+        repositoryVectorStoreId: input.repositoryVectorStoreId,
         openai
       })
 
@@ -168,7 +181,8 @@ async function runQa(input: StartRunInput, signal: AbortSignal) {
         return
       }
 
-      const actionResult = await executeAction(page, decision, credentials)
+      const actionExecution = await executeAction(page, decision, credentials, cursorPosition)
+      cursorPosition = actionExecution.cursorPosition
 
       if (await shouldStopRun(client, input, signal)) {
         return
@@ -181,7 +195,7 @@ async function runQa(input: StartRunInput, signal: AbortSignal) {
         url: page.url(),
         screenshotPath,
         decision,
-        actionResult
+        actionResult: actionExecution.result
       })
 
       await insertIssues(client, {
@@ -196,7 +210,7 @@ async function runQa(input: StartRunInput, signal: AbortSignal) {
         step: stepNumber,
         observation: decision.observation,
         action: sanitizeAction(decision.next_action),
-        result: actionResult
+        result: actionExecution.result
       })
 
       if (decision.goal_status === 'completed' || decision.next_action.type === 'stop') {
@@ -369,7 +383,7 @@ async function collectElementInventory(page: Page): Promise<ElementInventoryItem
   }) as ElementInventoryItem[]
 }
 
-async function executeAction(page: Page, decision: AgentDecision, credentials: RunCredentials) {
+async function executeAction(page: Page, decision: AgentDecision, credentials: RunCredentials, cursorPosition: CursorPoint) {
   const action = decision.next_action
   const result: Record<string, unknown> = {
     type: action.type,
@@ -377,30 +391,36 @@ async function executeAction(page: Page, decision: AgentDecision, credentials: R
     target_description: action.target_description,
     reason: action.reason
   }
+  let nextCursorPosition = cursorPosition
 
   try {
     if (action.type === 'stop') {
-      return { ...result, status: 'stopped' }
+      await ensureVisibleCursor(page, nextCursorPosition)
+      return { result: { ...result, status: 'stopped' }, cursorPosition: nextCursorPosition }
     }
 
     if (action.type === 'wait') {
+      await ensureVisibleCursor(page, nextCursorPosition)
       await page.waitForTimeout(1200)
-      return { ...result, status: 'ok' }
+      return { result: { ...result, status: 'ok' }, cursorPosition: nextCursorPosition }
     }
 
     if (action.type === 'scroll') {
+      nextCursorPosition = await moveVisibleCursor(page, nextCursorPosition, viewportCenter(page))
       await page.mouse.wheel(0, action.direction === 'up' ? -700 : 700)
       await page.waitForTimeout(500)
-      return { ...result, status: 'ok' }
+      return { result: { ...result, status: 'ok' }, cursorPosition: nextCursorPosition }
     }
 
     if (action.type === 'navigate') {
+      await ensureVisibleCursor(page, nextCursorPosition)
       const nextUrl = new URL(action.url)
       if (!['http:', 'https:'].includes(nextUrl.protocol)) {
         throw new Error('Blocked non-HTTP navigation')
       }
       await page.goto(nextUrl.toString(), { waitUntil: 'domcontentloaded', timeout: 30000 })
-      return { ...result, status: 'ok' }
+      await ensureVisibleCursor(page, nextCursorPosition)
+      return { result: { ...result, status: 'ok' }, cursorPosition: nextCursorPosition }
     }
 
     const locator = action.target_id
@@ -408,21 +428,140 @@ async function executeAction(page: Page, decision: AgentDecision, credentials: R
       : fallbackLocator(page, action.target_description)
 
     if (action.type === 'click') {
+      const targetPoint = await cursorPointForLocator(page, locator)
+      if (targetPoint) {
+        nextCursorPosition = await moveVisibleCursor(page, nextCursorPosition, targetPoint)
+      }
+
       await locator.click({ timeout: 8000 })
       await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => undefined)
-      return { ...result, status: 'ok' }
+      await ensureVisibleCursor(page, nextCursorPosition)
+      return { result: { ...result, status: 'ok' }, cursorPosition: nextCursorPosition }
     }
 
     if (action.type === 'type') {
+      const targetPoint = await cursorPointForLocator(page, locator)
+      if (targetPoint) {
+        nextCursorPosition = await moveVisibleCursor(page, nextCursorPosition, targetPoint)
+      }
+
       const text = await resolveActionText(locator, action, credentials)
       await locator.fill(text.value, { timeout: 8000 })
-      return { ...result, status: 'ok', text: text.reportText }
+      return { result: { ...result, status: 'ok', text: text.reportText }, cursorPosition: nextCursorPosition }
     }
   } catch (error: unknown) {
-    return { ...result, status: 'error', error: error instanceof Error ? error.message : 'Action failed' }
+    return {
+      result: { ...result, status: 'error', error: error instanceof Error ? error.message : 'Action failed' },
+      cursorPosition: nextCursorPosition
+    }
   }
 
-  return { ...result, status: 'ignored' }
+  return { result: { ...result, status: 'ignored' }, cursorPosition: nextCursorPosition }
+}
+
+async function cursorPointForLocator(page: Page, locator: Locator): Promise<CursorPoint | null> {
+  await locator.scrollIntoViewIfNeeded({ timeout: CURSOR_TARGET_TIMEOUT_MS }).catch(() => undefined)
+
+  const box = await locator.boundingBox({ timeout: CURSOR_TARGET_TIMEOUT_MS }).catch(() => null)
+  if (!box) {
+    return null
+  }
+
+  return clampCursorPoint(page, {
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2
+  })
+}
+
+async function moveVisibleCursor(page: Page, from: CursorPoint, to: CursorPoint) {
+  const start = clampCursorPoint(page, from)
+  const target = clampCursorPoint(page, to)
+  await ensureVisibleCursor(page, start)
+  await page.mouse.move(target.x, target.y, { steps: 12 })
+  await ensureVisibleCursor(page, target)
+  await page.waitForTimeout(CURSOR_MOVE_DURATION_MS)
+
+  return target
+}
+
+async function ensureVisibleCursor(page: Page, point: CursorPoint) {
+  const safePoint = clampCursorPoint(page, point)
+  await page.evaluate(({ duration, id, x, y }) => {
+    type BrowserCursorElement = {
+      id: string
+      innerHTML: string
+      style: Record<string, string>
+      setAttribute: (name: string, value: string) => void
+    }
+    type BrowserDocument = {
+      createElement: (tagName: string) => BrowserCursorElement
+      documentElement: {
+        appendChild: (element: BrowserCursorElement) => void
+      }
+      getElementById: (id: string) => BrowserCursorElement | null
+    }
+
+    const documentRef = (globalThis as unknown as { document: BrowserDocument }).document
+    let cursor = documentRef.getElementById(id)
+
+    if (!cursor) {
+      cursor = documentRef.createElement('div')
+      cursor.id = id
+      cursor.innerHTML = [
+        '<svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">',
+        '<path d="M3 2L3 24L9.5 18.1L13.2 27.1L17.5 25.3L13.6 16.5H22.8L3 2Z" fill="white" stroke="#111827" stroke-width="2" stroke-linejoin="round"/>',
+        '</svg>'
+      ].join('')
+      cursor.setAttribute('aria-hidden', 'true')
+      Object.assign(cursor.style, {
+        position: 'fixed',
+        left: '0',
+        top: '0',
+        width: '30px',
+        height: '30px',
+        zIndex: '2147483647',
+        pointerEvents: 'none',
+        overflow: 'visible',
+        transition: `transform ${duration}ms cubic-bezier(0.2, 0.8, 0.2, 1)`,
+        filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.35))'
+      })
+      documentRef.documentElement.appendChild(cursor)
+    }
+
+    cursor.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`
+  }, {
+    duration: CURSOR_MOVE_DURATION_MS,
+    id: VISIBLE_CURSOR_ID,
+    x: safePoint.x,
+    y: safePoint.y
+  }).catch(() => undefined)
+}
+
+function viewportCenter(page: Page): CursorPoint {
+  const viewport = page.viewportSize()
+  if (!viewport) {
+    return INITIAL_CURSOR_POSITION
+  }
+
+  return {
+    x: viewport.width / 2,
+    y: viewport.height / 2
+  }
+}
+
+function clampCursorPoint(page: Page, point: CursorPoint): CursorPoint {
+  const viewport = page.viewportSize()
+  if (!viewport) {
+    return {
+      x: Math.max(0, Math.round(point.x)),
+      y: Math.max(0, Math.round(point.y))
+    }
+  }
+
+  return {
+    x: Math.max(0, Math.min(viewport.width - 1, Math.round(point.x))),
+    y: Math.max(0, Math.min(viewport.height - 1, Math.round(point.y)))
+  }
 }
 
 function fallbackLocator(page: Page, description: string) {

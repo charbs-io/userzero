@@ -17,6 +17,7 @@ type DecideInput = {
   screenshot: Buffer
   credentialFields: string[]
   githubContext?: GithubRepositoryContext | null
+  repositoryVectorStoreId?: string | null
   openai: {
     apiKey: string
     model: string
@@ -32,6 +33,7 @@ export async function decideNextAction(input: DecideInput): Promise<AgentDecisio
     instructions: [
       'You are Ghost Customer, an AI QA/customer-simulation agent.',
       'Use the screenshot and element inventory to choose the next Playwright action toward the user goal.',
+      'Use repository file search when it is available to connect visible product behavior to likely implementation details.',
       'Prefer target_id from the element inventory. Use coordinates only indirectly by leaving target_id blank if no element matches.',
       'Do not stop because signup/login credentials were not supplied. Product Warden provides disposable test credential placeholders for this run.',
       'If a credential is needed, put the exact placeholder in next_action.text, for example credential.email, credential.username, or credential.password.',
@@ -66,7 +68,13 @@ export async function decideNextAction(input: DecideInput): Promise<AgentDecisio
         strict: true,
         schema: agentDecisionSchema
       }
-    }
+    },
+    tools: input.repositoryVectorStoreId
+      ? [{
+          type: 'file_search',
+          vector_store_ids: [input.repositoryVectorStoreId]
+        }]
+      : undefined
   })
 
   const parsed = JSON.parse(response.output_text) as AgentDecision

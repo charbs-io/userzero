@@ -51,7 +51,7 @@ Create a GitHub App for repository connections. For an organization-owned app, u
 - Post installation setup URL: `https://<your-domain>/api/github/app/callback`
 - Webhook URL: `https://<your-domain>/api/github/app/webhook`
 - Webhook secret: generate one with `openssl rand -hex 32`, paste it into GitHub, and save the same value as `GITHUB_APP_WEBHOOK_SECRET`.
-- Repository permissions: Contents read, Issues write, Pull requests write. Metadata read is included by GitHub.
+- Repository permissions: Contents write, Issues write, Pull requests write. Metadata read is included by GitHub.
 - Subscribe to events: Installation, Installation repositories.
 - Installation target: choose **Only on this account** unless this app needs to be installable by other GitHub accounts.
 

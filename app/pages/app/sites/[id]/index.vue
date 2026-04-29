@@ -37,7 +37,7 @@ const columns: TableColumn<QaRun>[] = [{
     <template #header>
       <SiteHeader :site-id="siteId" :title="site?.hostname || 'Site'">
         <template #right>
-          <UButton :to="`/runs/new?site=${siteId}`" icon="i-lucide-play" label="New run" />
+          <UButton :to="`/app/runs/new?site=${siteId}`" icon="i-lucide-play" label="New run" />
         </template>
       </SiteHeader>
     </template>
@@ -78,7 +78,7 @@ const columns: TableColumn<QaRun>[] = [{
                 Runs
               </h2>
               <UButton
-                :to="`/runs/new?site=${siteId}`"
+                :to="`/app/runs/new?site=${siteId}`"
                 color="neutral"
                 variant="outline"
                 size="sm"
@@ -113,7 +113,7 @@ const columns: TableColumn<QaRun>[] = [{
 
             <template #actions-cell="{ row }">
               <UButton
-                :to="`/runs/${row.original.id}`"
+                :to="`/app/runs/${row.original.id}`"
                 color="neutral"
                 variant="ghost"
                 size="sm"

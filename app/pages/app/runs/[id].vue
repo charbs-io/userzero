@@ -4,14 +4,22 @@ import type { QaIssue, QaRun, QaStep } from '~/types'
 const route = useRoute()
 const toast = useToast()
 const stopPending = ref(false)
+const creatingIssueId = ref<string | null>(null)
+const creatingPrId = ref<string | null>(null)
 const selectedScreenshot = ref<{ src: string, title: string, alt: string } | null>(null)
 
 const { data, refresh, pending } = await useFetch<{
   run: QaRun
   steps: QaStep[]
   issues: QaIssue[]
+  github: {
+    full_name: string
+    allow_issue_creation: boolean
+    allow_pr_creation: boolean
+    repository_index_status: string
+  } | null
 }>(() => `/api/runs/${route.params.id}`, {
-  default: () => ({ run: null as unknown as QaRun, steps: [], issues: [] })
+  default: () => ({ run: null as unknown as QaRun, steps: [], issues: [], github: null })
 })
 
 const terminal = computed(() => ['completed', 'blocked', 'failed', 'cancelled'].includes(data.value.run?.status))
@@ -77,6 +85,34 @@ async function stopRun() {
     toast.add({ title: 'Run could not be stopped', description: getErrorMessage(error), color: 'error' })
   } finally {
     stopPending.value = false
+  }
+}
+
+async function createGithubIssue(issue: QaIssue) {
+  creatingIssueId.value = issue.id
+
+  try {
+    await $fetch(`/api/issues/${issue.id}/github/issue`, { method: 'POST' })
+    await refresh()
+    toast.add({ title: 'GitHub issue created', color: 'success' })
+  } catch (error: unknown) {
+    toast.add({ title: 'GitHub issue could not be created', description: getErrorMessage(error), color: 'error' })
+  } finally {
+    creatingIssueId.value = null
+  }
+}
+
+async function createGithubPullRequest(issue: QaIssue) {
+  creatingPrId.value = issue.id
+
+  try {
+    await $fetch(`/api/issues/${issue.id}/github/pull-request`, { method: 'POST' })
+    await refresh()
+    toast.add({ title: 'GitHub pull request created', color: 'success' })
+  } catch (error: unknown) {
+    toast.add({ title: 'GitHub pull request could not be created', description: getErrorMessage(error), color: 'error' })
+  } finally {
+    creatingPrId.value = null
   }
 }
 
@@ -246,6 +282,50 @@ function getErrorMessage(error: unknown) {
                     <p class="mt-2 text-sm">
                       {{ issue.suggested_fix }}
                     </p>
+                    <div v-if="data.github" class="mt-3 flex flex-wrap gap-2">
+                      <UButton
+                        v-if="issue.github_issue_url"
+                        :to="issue.github_issue_url"
+                        target="_blank"
+                        color="neutral"
+                        variant="outline"
+                        size="sm"
+                        icon="i-lucide-circle-dot"
+                        label="Open issue"
+                      />
+                      <UButton
+                        v-else
+                        color="neutral"
+                        variant="outline"
+                        size="sm"
+                        icon="i-lucide-circle-dot"
+                        label="Create issue"
+                        :loading="creatingIssueId === issue.id"
+                        :disabled="!data.github.allow_issue_creation"
+                        @click="createGithubIssue(issue)"
+                      />
+                      <UButton
+                        v-if="issue.github_pr_url"
+                        :to="issue.github_pr_url"
+                        target="_blank"
+                        color="neutral"
+                        variant="outline"
+                        size="sm"
+                        icon="i-lucide-git-pull-request"
+                        label="Open PR"
+                      />
+                      <UButton
+                        v-else
+                        color="primary"
+                        variant="outline"
+                        size="sm"
+                        icon="i-lucide-git-pull-request"
+                        label="Create PR"
+                        :loading="creatingPrId === issue.id"
+                        :disabled="!data.github.allow_pr_creation || data.github.repository_index_status !== 'ready'"
+                        @click="createGithubPullRequest(issue)"
+                      />
+                    </div>
                   </div>
                   <p v-if="!data.issues.length" class="text-sm text-muted">
                     No issues recorded yet.

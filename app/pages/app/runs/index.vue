@@ -78,7 +78,7 @@ function getErrorMessage(error: unknown) {
     <template #header>
       <UDashboardNavbar title="Runs">
         <template #right>
-          <UButton to="/runs/new" icon="i-lucide-play" label="New run" />
+          <UButton to="/app/runs/new" icon="i-lucide-play" label="New run" />
         </template>
       </UDashboardNavbar>
     </template>
@@ -117,7 +117,7 @@ function getErrorMessage(error: unknown) {
                 @click="stopRun(row.original)"
               />
               <UButton
-                :to="`/runs/${row.original.id}`"
+                :to="`/app/runs/${row.original.id}`"
                 color="neutral"
                 variant="ghost"
                 size="sm"
