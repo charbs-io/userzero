@@ -120,8 +120,8 @@ function getErrorMessage(error: unknown) {
             </UFormField>
 
             <div class="grid gap-4 md:grid-cols-2">
-              <UFormField label="Test username" name="username">
-                <UInput v-model="form.username" autocomplete="off" placeholder="Optional" />
+              <UFormField label="Test email/username" name="username">
+                <UInput v-model="form.username" autocomplete="off" placeholder="Auto-generate if blank" />
               </UFormField>
 
               <UFormField label="Test password" name="password">
@@ -129,7 +129,7 @@ function getErrorMessage(error: unknown) {
                   v-model="form.password"
                   type="password"
                   autocomplete="off"
-                  placeholder="Optional"
+                  placeholder="Auto-generate if blank"
                 />
               </UFormField>
             </div>

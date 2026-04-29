@@ -7,7 +7,12 @@ type DecideInput = {
   goal: string
   currentUrl: string
   stepNumber: number
-  history: Array<{ step: number, observation: string, action: Record<string, unknown> }>
+  history: Array<{
+    step: number
+    observation: string
+    action: Record<string, unknown>
+    result: Record<string, unknown>
+  }>
   elements: ElementInventoryItem[]
   screenshot: Buffer
   credentialFields: string[]
@@ -30,7 +35,10 @@ export async function decideNextAction(input: DecideInput): Promise<AgentDecisio
       'Use the screenshot and element inventory to choose the next Playwright action toward the user goal.',
       'Use repository file search when it is available to connect visible product behavior to likely implementation details.',
       'Prefer target_id from the element inventory. Use coordinates only indirectly by leaving target_id blank if no element matches.',
-      'Never invent credentials. If a credential is needed, put credential.username or credential.password in next_action.text.',
+      'Do not stop because signup/login credentials were not supplied. Product Warden provides disposable test credential placeholders for this run.',
+      'If a credential is needed, put the exact placeholder in next_action.text, for example credential.email, credential.username, or credential.password.',
+      'You may create disposable test accounts and harmless profile/workspace values needed for the stated goal.',
+      'Do not perform real purchases, paid upgrades, destructive account actions, phone verification, government identity checks, or external email/OTP access. Stop and report that blocker if the journey requires one.',
       'Report only issues visible from this journey. Be specific, concise, and avoid duplicates.'
     ].join('\n'),
     input: [{
