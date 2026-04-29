@@ -4,9 +4,11 @@ import { createServiceSupabaseClient, requireUser } from '../../utils/supabase'
 import { assertHostnameCovered, assertPublicHostname, normalizeTargetUrl } from '../../utils/security'
 import { loadUserOpenAIConfig } from '../../utils/openai-settings'
 import { startQaRun } from '../../utils/agent/runner'
+import { loadGithubRepositoryContext } from '../../utils/github-context'
 
 const schema = z.object({
-  url: z.string().url(),
+  siteId: z.string().uuid(),
+  url: z.string().url().optional(),
   persona: z.string().min(3).max(500),
   goal: z.string().min(3).max(1000),
   maxSteps: z.number().int().min(3).max(40).default(20),
@@ -19,28 +21,35 @@ const schema = z.object({
 export default defineEventHandler(async (event) => {
   const user = await requireUser(event)
   const body = await readValidatedBody(event, schema.parse)
-  const target = normalizeTargetUrl(body.url)
   const client = createServiceSupabaseClient(event)
 
-  const { data: domains, error: domainError } = await client
-    .from('verified_domains')
-    .select('hostname')
+  const { data: site, error: siteError } = await client
+    .from('sites')
+    .select('id, base_url, hostname, verified_at')
+    .eq('id', body.siteId)
     .eq('user_id', user.id)
-    .not('verified_at', 'is', null)
+    .single()
 
-  if (domainError) {
-    throw createError({ statusCode: 500, statusMessage: domainError.message })
+  if (siteError || !site) {
+    throw createError({ statusCode: 404, statusMessage: 'Site not found' })
   }
 
-  const verifiedDomains = (domains || []).map(domain => domain.hostname)
-  assertHostnameCovered(target.hostname, verifiedDomains)
+  if (!site.verified_at) {
+    throw createError({ statusCode: 403, statusMessage: 'Verify this site before starting a run' })
+  }
+
+  const target = normalizeTargetUrl(body.url || site.base_url)
+  const verifiedHostnames = [site.hostname]
+  assertHostnameCovered(target.hostname, verifiedHostnames)
   await assertPublicHostname(target.hostname)
+  const githubContext = await loadGithubRepositoryContext(client, user.id, site.id).catch(() => null)
   const openai = await loadUserOpenAIConfig(client, user.id, event)
 
   const { data: run, error } = await client
     .from('qa_runs')
     .insert({
       user_id: user.id,
+      site_id: site.id,
       target_url: target.toString(),
       target_hostname: target.hostname,
       persona: body.persona,
@@ -62,7 +71,8 @@ export default defineEventHandler(async (event) => {
     persona: run.persona,
     goal: run.goal,
     maxSteps: run.max_steps,
-    verifiedDomains,
+    verifiedHostnames,
+    githubContext,
     credentials: {
       username: body.credentials?.username,
       password: body.credentials?.password

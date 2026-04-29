@@ -14,31 +14,42 @@ export function hashToken(token: string) {
   return createHash('sha256').update(token).digest('hex')
 }
 
-export function normalizeHostname(input: string) {
+export function normalizeSiteUrl(input: string) {
   const trimmed = input.trim()
   if (!trimmed) {
-    throw createError({ statusCode: 400, statusMessage: 'Domain is required' })
+    throw createError({ statusCode: 400, statusMessage: 'Site URL is required' })
   }
 
-  const withProtocol = trimmed.includes('://') ? trimmed : `https://${trimmed}`
   let parsed: URL
 
   try {
-    parsed = new URL(withProtocol)
+    parsed = new URL(trimmed)
   } catch {
-    throw createError({ statusCode: 400, statusMessage: 'Enter a valid domain or URL' })
+    throw createError({ statusCode: 400, statusMessage: 'Enter a valid site URL including http:// or https://' })
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw createError({ statusCode: 400, statusMessage: 'Site URL must start with http:// or https://' })
   }
 
   const hostname = domainToASCII(parsed.hostname.toLowerCase()).replace(/\.$/, '')
   if (!hostname || hostname.includes('..')) {
-    throw createError({ statusCode: 400, statusMessage: 'Enter a valid hostname' })
+    throw createError({ statusCode: 400, statusMessage: 'Enter a valid site hostname' })
   }
 
   if (blockedHostnames.has(hostname) || isIP(hostname)) {
-    throw createError({ statusCode: 400, statusMessage: 'Public domain ownership is required' })
+    throw createError({ statusCode: 400, statusMessage: 'Public site ownership is required' })
   }
 
-  return hostname
+  parsed.hostname = hostname
+  parsed.pathname = '/'
+  parsed.search = ''
+  parsed.hash = ''
+
+  return {
+    baseUrl: parsed.origin,
+    hostname
+  }
 }
 
 export function normalizeTargetUrl(input: string) {
@@ -50,8 +61,8 @@ export function normalizeTargetUrl(input: string) {
     throw createError({ statusCode: 400, statusMessage: 'Enter a valid target URL' })
   }
 
-  if (parsed.protocol !== 'https:') {
-    throw createError({ statusCode: 400, statusMessage: 'Only HTTPS target URLs are supported' })
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw createError({ statusCode: 400, statusMessage: 'Only HTTP and HTTPS target URLs are supported' })
   }
 
   parsed.hash = ''
@@ -62,13 +73,13 @@ export function isHostnameCovered(targetHostname: string, verifiedHostname: stri
   return targetHostname === verifiedHostname || targetHostname.endsWith(`.${verifiedHostname}`)
 }
 
-export function assertHostnameCovered(targetHostname: string, verifiedDomains: string[]) {
-  const covered = verifiedDomains.some(hostname => isHostnameCovered(targetHostname, hostname))
+export function assertHostnameCovered(targetHostname: string, verifiedHostnames: string[]) {
+  const covered = verifiedHostnames.some(hostname => isHostnameCovered(targetHostname, hostname))
 
   if (!covered) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Target URL is not covered by a verified domain'
+      statusMessage: 'Target URL is not covered by the verified site'
     })
   }
 }

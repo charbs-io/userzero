@@ -1,0 +1,71 @@
+import { z } from 'zod'
+import { createError, getRouterParam, readValidatedBody } from 'h3'
+import { createServiceSupabaseClient, requireUser } from '../../../../utils/supabase'
+import { createInstallationAccessToken, githubInstallationRequest, type GithubRepository } from '../../../../utils/github-app'
+import { getUserSite } from '../../../../utils/sites'
+
+const schema = z.object({
+  installationId: z.number().int().positive(),
+  repositoryId: z.number().int().positive(),
+  useRepositoryContext: z.boolean().default(true),
+  allowIssueCreation: z.boolean().default(false),
+  allowPrCreation: z.boolean().default(false)
+})
+
+type RepositoriesResponse = {
+  repositories: GithubRepository[]
+}
+
+export default defineEventHandler(async (event) => {
+  const user = await requireUser(event)
+  const id = getRouterParam(event, 'id') || ''
+  const body = await readValidatedBody(event, schema.parse)
+  const client = createServiceSupabaseClient(event)
+  await getUserSite(client, user.id, id)
+
+  const token = await createInstallationAccessToken(event, body.installationId, {
+    repositoryIds: [body.repositoryId],
+    permissions: {
+      contents: 'read',
+      issues: body.allowIssueCreation ? 'write' : 'read',
+      metadata: 'read',
+      pull_requests: body.allowPrCreation ? 'write' : 'read'
+    }
+  })
+  const response = await githubInstallationRequest<RepositoriesResponse>(token.token, '/installation/repositories?per_page=100')
+  const repository = response.repositories.find(repo => repo.id === body.repositoryId)
+
+  if (!repository) {
+    throw createError({ statusCode: 400, statusMessage: 'Selected repository is not available to this GitHub App installation' })
+  }
+
+  const now = new Date().toISOString()
+  const { data, error } = await client
+    .from('site_github_connections')
+    .upsert({
+      site_id: id,
+      user_id: user.id,
+      installation_id: body.installationId,
+      repository_id: repository.id,
+      owner: repository.owner.login,
+      repo: repository.name,
+      full_name: repository.full_name,
+      html_url: repository.html_url,
+      default_branch: repository.default_branch,
+      permissions: token.permissions || repository.permissions || {},
+      use_repository_context: body.useRepositoryContext,
+      allow_issue_creation: body.allowIssueCreation,
+      allow_pr_creation: body.allowPrCreation,
+      connected_at: now,
+      disconnected_at: null,
+      updated_at: now
+    }, { onConflict: 'site_id' })
+    .select('site_id, installation_id, repository_id, owner, repo, full_name, html_url, default_branch, permissions, use_repository_context, allow_issue_creation, allow_pr_creation, connected_at, disconnected_at, updated_at')
+    .single()
+
+  if (error) {
+    throw createError({ statusCode: 500, statusMessage: error.message })
+  }
+
+  return data
+})

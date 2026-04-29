@@ -18,6 +18,10 @@ export default defineNuxtConfig({
     openaiModel: 'gpt-5.4-mini',
     openaiReportModel: 'gpt-5.5',
     screenshotBucket: 'qa-screenshots',
+    githubAppId: '',
+    githubAppPrivateKey: '',
+    githubAppSlug: '',
+    githubAppWebhookSecret: '',
     public: {
       appBaseUrl: '',
       supabaseUrl: '',

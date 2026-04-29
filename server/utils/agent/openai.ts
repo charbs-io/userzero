@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { agentDecisionSchema, type AgentDecision, type ElementInventoryItem } from '../agent-types'
+import type { GithubRepositoryContext } from '../github-context'
 
 type DecideInput = {
   persona: string
@@ -10,6 +11,7 @@ type DecideInput = {
   elements: ElementInventoryItem[]
   screenshot: Buffer
   credentialFields: string[]
+  githubContext?: GithubRepositoryContext | null
   openai: {
     apiKey: string
     model: string
@@ -39,6 +41,7 @@ export async function decideNextAction(input: DecideInput): Promise<AgentDecisio
           current_url: input.currentUrl,
           step_number: input.stepNumber,
           available_credential_fields: input.credentialFields,
+          github_repository_context: input.githubContext || null,
           history: input.history.slice(-8),
           elements: input.elements.slice(0, 80)
         })

@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import type { VerifiedDomain } from '~/types'
+import type { SelectItem } from '@nuxt/ui'
+import type { Site } from '~/types'
 
 const toast = useToast()
+const route = useRoute()
 const router = useRouter()
 const submitting = ref(false)
 
 const form = reactive({
+  siteId: String(route.query.site || ''),
   url: '',
   persona: 'first-time founder setting up a team workspace',
   goal: '',
@@ -14,20 +17,37 @@ const form = reactive({
   maxSteps: 20
 })
 
-const { data: domains } = await useFetch<VerifiedDomain[]>('/api/domains', {
+const { data: sites } = await useFetch<Site[]>('/api/sites', {
   default: () => []
 })
 
-const verifiedDomains = computed(() => domains.value.filter(domain => domain.verified_at))
+const verifiedSites = computed(() => sites.value.filter(site => site.verified_at))
+const siteItems = computed<SelectItem[]>(() => verifiedSites.value.map(site => ({
+  label: `${site.hostname} (${site.base_url})`,
+  value: site.id
+})))
+const selectedSite = computed(() => verifiedSites.value.find(site => site.id === form.siteId) || null)
+
+watchEffect(() => {
+  if (!form.siteId && verifiedSites.value[0]) {
+    form.siteId = verifiedSites.value[0].id
+  }
+})
 
 async function startRun() {
+  if (!form.siteId) {
+    toast.add({ title: 'Choose a verified site', color: 'warning' })
+    return
+  }
+
   submitting.value = true
 
   try {
     const response = await $fetch<{ id: string }>('/api/runs', {
       method: 'POST',
       body: {
-        url: form.url,
+        siteId: form.siteId,
+        url: form.url || undefined,
         persona: form.persona,
         goal: form.goal,
         maxSteps: Number(form.maxSteps),
@@ -67,14 +87,23 @@ function getErrorMessage(error: unknown) {
                 Customer simulation
               </h2>
               <p class="text-sm text-muted">
-                User Zero will visually inspect the product, act through Playwright, and produce a QA report.
+                User Zero will visually inspect the site, act through Playwright, and produce a QA report.
               </p>
             </div>
           </template>
 
           <form class="space-y-4" @submit.prevent="startRun">
-            <UFormField label="Target URL" name="url" required>
-              <UInput v-model="form.url" placeholder="https://app.example.com/signup" required />
+            <UFormField label="Site" name="siteId" required>
+              <USelect
+                v-model="form.siteId"
+                :items="siteItems"
+                placeholder="Choose a verified site"
+                class="w-full"
+              />
+            </UFormField>
+
+            <UFormField label="Start URL" name="url">
+              <UInput v-model="form.url" :placeholder="selectedSite?.base_url || 'https://app.example.com/signup'" />
             </UFormField>
 
             <UFormField label="Persona" name="persona" required>
@@ -120,6 +149,7 @@ function getErrorMessage(error: unknown) {
                 icon="i-lucide-play"
                 label="Start QA run"
                 :loading="submitting"
+                :disabled="!verifiedSites.length"
               />
             </div>
           </form>
@@ -130,20 +160,20 @@ function getErrorMessage(error: unknown) {
             icon="i-lucide-shield-check"
             color="primary"
             variant="subtle"
-            title="Only verified domains can be tested"
-            description="If the target URL redirects to an unverified domain, the run stops."
+            title="Only verified sites can be tested"
+            description="If the target URL redirects outside the selected site hostname, the run stops."
           />
 
           <UCard>
             <template #header>
               <h2 class="text-base font-semibold">
-                Ready domains
+                Ready sites
               </h2>
             </template>
-            <div v-if="verifiedDomains.length" class="space-y-2">
-              <div v-for="domain in verifiedDomains" :key="domain.id" class="flex items-center gap-2 text-sm">
+            <div v-if="verifiedSites.length" class="space-y-2">
+              <div v-for="site in verifiedSites" :key="site.id" class="flex items-center gap-2 text-sm">
                 <UIcon name="i-lucide-check" class="size-4 text-success" />
-                <span>{{ domain.hostname }}</span>
+                <span>{{ site.hostname }}</span>
               </div>
             </div>
             <UAlert
@@ -151,9 +181,30 @@ function getErrorMessage(error: unknown) {
               color="warning"
               variant="subtle"
               icon="i-lucide-triangle-alert"
-              title="No verified domains"
-              description="Add and verify a domain before starting a run."
+              title="No verified sites"
+              description="Add and verify a site before starting a run."
             />
+            <UButton
+              v-if="!verifiedSites.length"
+              to="/sites/new"
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-plus"
+              label="Add site"
+              block
+              class="mt-3"
+            />
+          </UCard>
+
+          <UCard v-if="selectedSite?.github_connection && !selectedSite.github_connection.disconnected_at">
+            <template #header>
+              <h2 class="text-base font-semibold">
+                Repository context
+              </h2>
+            </template>
+            <p class="text-sm text-muted">
+              {{ selectedSite.github_connection.use_repository_context ? selectedSite.github_connection.full_name : 'Repository context is disabled for this site.' }}
+            </p>
           </UCard>
         </div>
       </div>

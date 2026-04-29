@@ -13,16 +13,9 @@ const links = [[{
     open.value = false
   }
 }, {
-  label: 'Domains',
-  icon: 'i-lucide-globe-lock',
-  to: '/domains',
-  onSelect: () => {
-    open.value = false
-  }
-}, {
-  label: 'New run',
-  icon: 'i-lucide-play-circle',
-  to: '/runs/new',
+  label: 'Sites',
+  icon: 'i-lucide-panels-top-left',
+  to: '/sites',
   onSelect: () => {
     open.value = false
   }
@@ -52,10 +45,10 @@ const groups = computed(() => [{
     icon: 'i-lucide-play',
     to: '/runs/new'
   }, {
-    id: 'verify-domain',
-    label: 'Verify a domain',
+    id: 'add-site',
+    label: 'Add a site',
     icon: 'i-lucide-shield-check',
-    to: '/domains'
+    to: '/sites/new'
   }]
 }])
 </script>

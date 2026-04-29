@@ -1,6 +1,6 @@
 # User Zero
 
-User Zero is a Nuxt 4 and Nuxt UI app for AI-powered QA/customer simulation. Users sign in with GitHub, verify ownership of a domain, start a browser run against a verified URL, and review screenshots, issues, trace steps, and a markdown report.
+User Zero is a Nuxt 4 and Nuxt UI app for AI-powered QA/customer simulation. Users sign in with GitHub, verify ownership of a site, optionally connect a GitHub repo for context, start a browser run against a verified URL, and review screenshots, issues, trace steps, and a markdown report.
 
 ## Stack
 
@@ -28,6 +28,10 @@ NUXT_PUBLIC_SUPABASE_URL=
 NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 API_KEY_ENCRYPTION_SECRET=
+GITHUB_APP_ID=
+GITHUB_APP_PRIVATE_KEY=
+GITHUB_APP_SLUG=
+GITHUB_APP_WEBHOOK_SECRET=
 ```
 
 Apply the Supabase migration in `supabase/migrations`.
@@ -39,6 +43,12 @@ Enable GitHub in Supabase Auth and configure:
 - GitHub OAuth callback: `https://<project-ref>.supabase.co/auth/v1/callback`
 - Supabase redirect URL: `http://localhost:3000/auth/callback`
 - Production redirect URL: `https://<your-domain>/auth/callback`
+
+Create a GitHub App for repository connections:
+
+- Setup callback URL: `https://<your-domain>/api/github/app/callback`
+- Webhook URL: `https://<your-domain>/api/github/app/webhook`
+- Repository permissions: Contents read, Issues write, Pull requests write
 
 ## Development
 
@@ -54,9 +64,9 @@ pnpm typecheck
 pnpm build
 ```
 
-## Domain Ownership
+## Site Ownership
 
-Users must verify a domain before testing it. User Zero accepts either:
+Users must verify a site before testing it. User Zero accepts either:
 
 ```html
 <meta name="userzero-site-verification" content="uzv_<token>">
