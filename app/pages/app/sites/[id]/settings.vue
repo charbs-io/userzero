@@ -100,7 +100,7 @@ function getErrorMessage(error: unknown) {
                 {{ site?.github_connection && !site.github_connection.disconnected_at ? site.github_connection.full_name : 'No repository connected.' }}
               </p>
               <UButton
-                :to="`/sites/${siteId}/github`"
+                :to="`/app/sites/${siteId}/github`"
                 color="neutral"
                 variant="outline"
                 icon="i-simple-icons-github"

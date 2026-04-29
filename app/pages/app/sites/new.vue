@@ -148,7 +148,7 @@ function getErrorMessage(error: unknown) {
                 />
                 <UButton
                   v-if="newSite.verified_at"
-                  :to="`/sites/${newSite.id}/github`"
+                  :to="`/app/sites/${newSite.id}/github`"
                   icon="i-simple-icons-github"
                   label="Connect GitHub"
                 />

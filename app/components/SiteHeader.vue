@@ -11,18 +11,18 @@ const route = useRoute()
 const items = computed<NavigationMenuItem[][]>(() => [[{
   label: 'Runs',
   icon: 'i-lucide-list-checks',
-  to: `/sites/${props.siteId}`,
-  active: route.path === `/sites/${props.siteId}`
+  to: `/app/sites/${props.siteId}`,
+  active: route.path === `/app/sites/${props.siteId}`
 }, {
   label: 'Site settings',
   icon: 'i-lucide-settings',
-  to: `/sites/${props.siteId}/settings`,
-  active: route.path === `/sites/${props.siteId}/settings`
+  to: `/app/sites/${props.siteId}/settings`,
+  active: route.path === `/app/sites/${props.siteId}/settings`
 }, {
   label: 'GitHub settings',
   icon: 'i-simple-icons-github',
-  to: `/sites/${props.siteId}/github`,
-  active: route.path === `/sites/${props.siteId}/github`
+  to: `/app/sites/${props.siteId}/github`,
+  active: route.path === `/app/sites/${props.siteId}/github`
 }]])
 </script>
 

@@ -110,7 +110,7 @@ async function saveConnection() {
       }
     })
     await refresh()
-    await router.replace(`/sites/${siteId.value}/github`)
+    await router.replace(`/app/sites/${siteId.value}/github`)
     toast.add({ title: 'GitHub settings saved', color: 'success' })
   } catch (error: unknown) {
     toast.add({ title: 'Could not save GitHub settings', description: getErrorMessage(error), color: 'error' })

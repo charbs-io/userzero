@@ -5,9 +5,9 @@ const _useDashboard = () => {
 
   defineShortcuts({
     'g-h': () => router.push('/'),
-    'g-s': () => router.push('/sites'),
-    'g-r': () => router.push('/runs'),
-    'n': () => router.push('/runs/new')
+    'g-s': () => router.push('/app/sites'),
+    'g-r': () => router.push('/app/runs'),
+    'n': () => router.push('/app/runs/new')
   })
 
   return {}
