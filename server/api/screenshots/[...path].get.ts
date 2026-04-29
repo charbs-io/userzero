@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   const pathParam = getRouterParam(event, 'path')
   const path = Array.isArray(pathParam) ? pathParam.join('/') : pathParam
 
-  if (!path || !/^[0-9a-f-]+\/step-\d+\.png$/i.test(path)) {
+  if (!path || !/^[0-9a-f-]+\/[0-9a-f-]+\/step-\d+\.png$/i.test(path)) {
     throw createError({ statusCode: 400, statusMessage: 'Invalid screenshot path' })
   }
 
