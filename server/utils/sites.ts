@@ -26,10 +26,42 @@ type GithubConnectionRow = {
   use_repository_context: boolean
   allow_issue_creation: boolean
   allow_pr_creation: boolean
+  repository_index_status: 'not_indexed' | 'indexing' | 'ready' | 'failed'
+  repository_indexed_branch: string | null
+  repository_indexed_sha: string | null
+  repository_index_started_at: string | null
+  repository_indexed_at: string | null
+  repository_index_error: string | null
+  repository_index_file_count: number
   connected_at: string
   disconnected_at: string | null
   updated_at: string
 }
+
+const publicGithubConnectionSelect = [
+  'site_id',
+  'installation_id',
+  'repository_id',
+  'owner',
+  'repo',
+  'full_name',
+  'html_url',
+  'default_branch',
+  'permissions',
+  'use_repository_context',
+  'allow_issue_creation',
+  'allow_pr_creation',
+  'repository_index_status',
+  'repository_indexed_branch',
+  'repository_indexed_sha',
+  'repository_index_started_at',
+  'repository_indexed_at',
+  'repository_index_error',
+  'repository_index_file_count',
+  'connected_at',
+  'disconnected_at',
+  'updated_at'
+].join(', ')
 
 export async function getUserSite(client: SupabaseClient, userId: string, siteId: string) {
   const { data, error } = await client
@@ -64,7 +96,7 @@ export async function getUserSiteForVerification(client: SupabaseClient, userId:
 export async function getSiteGithubConnection(client: SupabaseClient, userId: string, siteId: string) {
   const { data, error } = await client
     .from('site_github_connections')
-    .select('site_id, installation_id, repository_id, owner, repo, full_name, html_url, default_branch, permissions, use_repository_context, allow_issue_creation, allow_pr_creation, connected_at, disconnected_at, updated_at')
+    .select(publicGithubConnectionSelect)
     .eq('site_id', siteId)
     .eq('user_id', userId)
     .maybeSingle()
@@ -83,7 +115,7 @@ export async function attachGithubConnections(client: SupabaseClient, userId: st
 
   const { data, error } = await client
     .from('site_github_connections')
-    .select('site_id, installation_id, repository_id, owner, repo, full_name, html_url, default_branch, permissions, use_repository_context, allow_issue_creation, allow_pr_creation, connected_at, disconnected_at, updated_at')
+    .select(publicGithubConnectionSelect)
     .eq('user_id', userId)
     .in('site_id', sites.map(site => site.id))
 
@@ -91,7 +123,8 @@ export async function attachGithubConnections(client: SupabaseClient, userId: st
     throw createError({ statusCode: 500, statusMessage: error.message })
   }
 
-  const bySiteId = new Map((data || []).map(connection => [connection.site_id, connection as GithubConnectionRow]))
+  const connections = (data || []) as unknown as GithubConnectionRow[]
+  const bySiteId = new Map(connections.map(connection => [connection.site_id, connection]))
 
   return sites.map(site => ({
     ...site,

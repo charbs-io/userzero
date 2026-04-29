@@ -25,6 +25,7 @@ type StartRunInput = {
   verifiedHostnames: string[]
   credentials: RunCredentials
   githubContext?: GithubRepositoryContext | null
+  repositoryVectorStoreId?: string | null
   openai: {
     apiKey: string
     model: string
@@ -149,6 +150,7 @@ async function runQa(input: StartRunInput, signal: AbortSignal) {
         screenshot,
         credentialFields: credentialFields(input.credentials),
         githubContext: input.githubContext,
+        repositoryVectorStoreId: input.repositoryVectorStoreId,
         openai
       })
 

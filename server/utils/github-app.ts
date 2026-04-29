@@ -95,6 +95,7 @@ export async function githubInstallationRequest<T>(token: string, path: string, 
     headers: {
       'Accept': 'application/vnd.github+json',
       'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
       'X-GitHub-Api-Version': githubApiVersion,
       ...init.headers
     }

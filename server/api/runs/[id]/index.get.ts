@@ -39,12 +39,31 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: issuesError.message })
   }
 
+  const github = run.site_id ? await loadRunGithubState(client, user.id, run.site_id) : null
+
   return {
     run: withVideoUrl(run),
     steps: (steps || []).map(step => withScreenshotUrl(step)),
-    issues: (issues || []).map(issue => withScreenshotUrl(issue))
+    issues: (issues || []).map(issue => withScreenshotUrl(issue)),
+    github
   }
 })
+
+async function loadRunGithubState(client: ReturnType<typeof createServiceSupabaseClient>, userId: string, siteId: string) {
+  const { data, error } = await client
+    .from('site_github_connections')
+    .select('full_name, allow_issue_creation, allow_pr_creation, repository_index_status')
+    .eq('site_id', siteId)
+    .eq('user_id', userId)
+    .is('disconnected_at', null)
+    .maybeSingle()
+
+  if (error || !data) {
+    return null
+  }
+
+  return data
+}
 
 function withVideoUrl<T extends { video_path: string | null }>(row: T) {
   return {
