@@ -4,10 +4,12 @@
   "type": "module",
   "scripts": {
     "build": "nuxt build",
+    "build:index-worker": "esbuild workers/indexer/index.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/index-worker.mjs",
     "dev": "nuxt dev",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "setup:browsers": "playwright install chromium",
+    "start:index-worker": "node dist/index-worker.mjs",
     "lint": "eslint .",
     "typecheck": "nuxt typecheck"
   },
@@ -34,6 +36,7 @@
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.15.2",
+    "esbuild": "^0.27.7",
     "eslint": "^10.2.1",
     "typescript": "^6.0.3",
     "vue-tsc": "^3.2.7"

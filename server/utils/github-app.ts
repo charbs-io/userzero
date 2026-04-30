@@ -1,5 +1,6 @@
 import { createHmac, createSign, timingSafeEqual } from 'node:crypto'
-import { createError, type H3Event } from 'h3'
+import type { H3Event } from 'h3'
+import { createServerError } from '../lib/errors'
 
 const githubApiBase = 'https://api.github.com'
 const githubApiVersion = '2026-03-10'
@@ -37,8 +38,8 @@ export type GithubRepository = {
 }
 
 export function getGithubAppSlug(event?: H3Event) {
-  const config = event ? useRuntimeConfig(event) : useRuntimeConfig()
-  return config.githubAppSlug || process.env.GITHUB_APP_SLUG || ''
+  const config = getOptionalRuntimeConfig(event)
+  return config?.githubAppSlug || process.env.GITHUB_APP_SLUG || ''
 }
 
 export function signGithubSetupState(event: H3Event, payload: Omit<GithubStatePayload, 'expiresAt'>) {
@@ -55,17 +56,17 @@ export function signGithubSetupState(event: H3Event, payload: Omit<GithubStatePa
 export function verifyGithubSetupState(event: H3Event, state: string) {
   const [encoded, signature] = state.split('.')
   if (!encoded || !signature) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid GitHub setup state' })
+    throw createServerError(400, 'Invalid GitHub setup state')
   }
 
   const expected = signState(event, encoded)
   if (!safeEqual(signature, expected)) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid GitHub setup state' })
+    throw createServerError(400, 'Invalid GitHub setup state')
   }
 
   const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')) as GithubStatePayload
   if (payload.expiresAt < Date.now()) {
-    throw createError({ statusCode: 400, statusMessage: 'GitHub setup state expired' })
+    throw createServerError(400, 'GitHub setup state expired')
   }
 
   return payload
@@ -115,7 +116,7 @@ export async function githubInstallationRequest<T>(token: string, path: string, 
 
   if (!response.ok) {
     const message = await readGithubError(response)
-    throw createError({ statusCode: response.status, statusMessage: message })
+    throw createServerError(response.status, message)
   }
 
   if (response.status === 204) {
@@ -140,19 +141,19 @@ async function githubAppRequest<T>(event: H3Event | undefined, path: string, ini
 
   if (!response.ok) {
     const message = await readGithubError(response)
-    throw createError({ statusCode: response.status, statusMessage: message })
+    throw createServerError(response.status, message)
   }
 
   return await response.json() as T
 }
 
 function createGithubAppJwt(event?: H3Event) {
-  const config = event ? useRuntimeConfig(event) : useRuntimeConfig()
-  const appId = config.githubAppId || process.env.GITHUB_APP_ID
-  const privateKey = normalizePrivateKey(config.githubAppPrivateKey || process.env.GITHUB_APP_PRIVATE_KEY)
+  const config = getOptionalRuntimeConfig(event)
+  const appId = config?.githubAppId || process.env.GITHUB_APP_ID
+  const privateKey = normalizePrivateKey(config?.githubAppPrivateKey || process.env.GITHUB_APP_PRIVATE_KEY)
 
   if (!appId || !privateKey) {
-    throw createError({ statusCode: 500, statusMessage: 'GitHub App is not configured' })
+    throw createServerError(500, 'GitHub App is not configured')
   }
 
   const now = Math.floor(Date.now() / 1000)
@@ -170,34 +171,39 @@ function createGithubAppJwt(event?: H3Event) {
   try {
     return `${unsigned}.${signer.sign(privateKey, 'base64url')}`
   } catch {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'GitHub App private key is invalid. Set GITHUB_APP_PRIVATE_KEY to the full PEM, a single-line PEM with \\n, or a base64-encoded PEM.'
-    })
+    throw createServerError(500, 'GitHub App private key is invalid. Set GITHUB_APP_PRIVATE_KEY to the full PEM, a single-line PEM with \\n, or a base64-encoded PEM.')
   }
 }
 
 function signState(event: H3Event, encodedPayload: string) {
   const secret = getGithubStateSecret(event)
   if (!secret) {
-    throw createError({ statusCode: 500, statusMessage: 'GitHub App state secret is not configured' })
+    throw createServerError(500, 'GitHub App state secret is not configured')
   }
 
   return createHmac('sha256', secret).update(encodedPayload).digest('base64url')
 }
 
 function getGithubWebhookSecret(event: H3Event) {
-  const config = useRuntimeConfig(event)
-  return config.githubAppWebhookSecret || process.env.GITHUB_APP_WEBHOOK_SECRET || ''
+  const config = getOptionalRuntimeConfig(event)
+  return config?.githubAppWebhookSecret || process.env.GITHUB_APP_WEBHOOK_SECRET || ''
 }
 
 function getGithubStateSecret(event: H3Event) {
-  const config = useRuntimeConfig(event)
-  return config.githubAppWebhookSecret
-    || config.supabaseServiceRoleKey
+  const config = getOptionalRuntimeConfig(event)
+  return config?.githubAppWebhookSecret
+    || config?.supabaseServiceRoleKey
     || process.env.GITHUB_APP_WEBHOOK_SECRET
     || process.env.SUPABASE_SERVICE_ROLE_KEY
     || ''
+}
+
+function getOptionalRuntimeConfig(event?: H3Event) {
+  if (event) {
+    return useRuntimeConfig(event)
+  }
+
+  return typeof useRuntimeConfig === 'function' ? useRuntimeConfig() : null
 }
 
 function normalizePrivateKey(value?: string) {

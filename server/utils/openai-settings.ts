@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto'
 import type { H3Event } from 'h3'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { createError } from 'h3'
+import { createServerError } from '../lib/errors'
 
 const CIPHER_ALGORITHM = 'aes-256-gcm'
 const CIPHERTEXT_VERSION = 'v1'
@@ -21,7 +21,7 @@ export async function getOpenAISettingsStatus(client: SupabaseClient, userId: st
     .maybeSingle()
 
   if (error) {
-    throw createError({ statusCode: 500, statusMessage: error.message })
+    throw createServerError(500, error.message)
   }
 
   const row = data as OpenAISettingsRow | null
@@ -48,7 +48,7 @@ export async function saveUserOpenAIKey(client: SupabaseClient, userId: string, 
     .single()
 
   if (error) {
-    throw createError({ statusCode: 500, statusMessage: error.message })
+    throw createServerError(500, error.message)
   }
 
   const row = data as { openai_api_key_updated_at: string }
@@ -66,7 +66,7 @@ export async function clearUserOpenAIKey(client: SupabaseClient, userId: string)
     .eq('user_id', userId)
 
   if (error) {
-    throw createError({ statusCode: 500, statusMessage: error.message })
+    throw createServerError(500, error.message)
   }
 
   return {
@@ -83,16 +83,13 @@ export async function loadUserOpenAIConfig(client: SupabaseClient, userId: strin
     .maybeSingle()
 
   if (error) {
-    throw createError({ statusCode: 500, statusMessage: error.message })
+    throw createServerError(500, error.message)
   }
 
   const row = data as { encrypted_openai_api_key: string | null } | null
 
   if (!row?.encrypted_openai_api_key) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Add your OpenAI API key in Setup before starting a run'
-    })
+    throw createServerError(400, 'Add your OpenAI API key in Setup before starting a run')
   }
 
   const apiKey = decryptSecret(row.encrypted_openai_api_key, event)
@@ -130,10 +127,7 @@ function decryptSecret(encryptedSecret: string, event?: H3Event) {
   const [version, iv, authTag, ciphertext] = encryptedSecret.split(':')
 
   if (version !== CIPHERTEXT_VERSION || !iv || !authTag || !ciphertext) {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Stored OpenAI API key has an unsupported encryption format'
-    })
+    throw createServerError(500, 'Stored OpenAI API key has an unsupported encryption format')
   }
 
   try {
@@ -145,28 +139,30 @@ function decryptSecret(encryptedSecret: string, event?: H3Event) {
       decipher.final()
     ]).toString('utf8')
   } catch {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Stored OpenAI API key could not be decrypted; re-save it in Setup'
-    })
+    throw createServerError(500, 'Stored OpenAI API key could not be decrypted; re-save it in Setup')
   }
 }
 
 function getEncryptionKey(event?: H3Event) {
-  const config = event ? useRuntimeConfig(event) : useRuntimeConfig()
-  const secret = String(config.apiKeyEncryptionSecret || process.env.API_KEY_ENCRYPTION_SECRET || '')
+  const config = getOptionalRuntimeConfig(event)
+  const secret = String(config?.apiKeyEncryptionSecret || process.env.API_KEY_ENCRYPTION_SECRET || '')
 
   if (!secret || secret.length < MIN_SECRET_LENGTH) {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'API key encryption is not configured'
-    })
+    throw createServerError(500, 'API key encryption is not configured')
   }
 
   return createHash('sha256').update(secret).digest()
 }
 
 function getOpenAIModel(event?: H3Event) {
-  const config = event ? useRuntimeConfig(event) : useRuntimeConfig()
-  return String(config.openaiModel || process.env.OPENAI_MODEL || 'gpt-5.4-mini')
+  const config = getOptionalRuntimeConfig(event)
+  return String(config?.openaiModel || process.env.OPENAI_MODEL || 'gpt-5.4-mini')
+}
+
+function getOptionalRuntimeConfig(event?: H3Event) {
+  if (event) {
+    return useRuntimeConfig(event)
+  }
+
+  return typeof useRuntimeConfig === 'function' ? useRuntimeConfig() : null
 }

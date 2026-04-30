@@ -83,12 +83,29 @@ For local GitHub App callback or webhook testing, expose your local server with 
 pnpm dev
 ```
 
+Run the repository index worker locally after building it:
+
+```bash
+pnpm build:index-worker
+pnpm start:index-worker
+```
+
+## Railway Services
+
+Deploy two Railway services from this repository:
+
+- Web app: use the root `railway.json`; start command is `node .output/server/index.mjs`.
+- Repository index worker: set the config file path to `/workers/indexer/railway.json`; keep the root directory as `/` so the worker can share the root Dockerfile and server utilities.
+
+Both services need the same Supabase, GitHub App, and API key encryption environment variables. The worker does not need a public domain or health check.
+
 ## Verification
 
 ```bash
 pnpm lint
 pnpm typecheck
 pnpm build
+pnpm build:index-worker
 ```
 
 ## Site Ownership

@@ -9,7 +9,7 @@ import {
   type GithubRepository
 } from '../../../../utils/github-app'
 import { getUserSite } from '../../../../utils/sites'
-import { startGithubRepositoryIndex } from '../../../../utils/github-index'
+import { enqueueGithubRepositoryIndex } from '../../../../utils/github-index-jobs'
 
 const schema = z.object({
   installationId: z.number().int().positive(),
@@ -81,6 +81,7 @@ export default defineEventHandler(async (event) => {
       use_repository_context: body.useRepositoryContext,
       allow_issue_creation: body.allowIssueCreation,
       allow_pr_creation: body.allowPrCreation,
+      repository_index_job_id: null,
       repository_index_status: body.useRepositoryContext ? 'indexing' : 'not_indexed',
       repository_index_error: null,
       repository_index_file_count: 0,
@@ -96,7 +97,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (body.useRepositoryContext) {
-    startGithubRepositoryIndex({ siteId: id, userId: user.id })
+    await enqueueGithubRepositoryIndex(client, user.id, id)
   }
 
   return data

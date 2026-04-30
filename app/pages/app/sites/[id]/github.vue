@@ -54,6 +54,21 @@ watchEffect(() => {
   settings.allowPrCreation = activeConnection.value.allow_pr_creation
 })
 
+watch(
+  () => activeConnection.value?.repository_index_status,
+  (status, _previousStatus, onCleanup) => {
+    if (!import.meta.client || status !== 'indexing') {
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      void refresh()
+    }, 5000)
+    onCleanup(() => window.clearInterval(timer))
+  },
+  { immediate: true }
+)
+
 onMounted(async () => {
   if (installationId.value) {
     await loadRepositories()

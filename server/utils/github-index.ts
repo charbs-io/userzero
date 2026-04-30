@@ -1,14 +1,14 @@
 import OpenAI from 'openai'
-import { createError, type H3Event } from 'h3'
+import type { H3Event } from 'h3'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createInstallationAccessToken, githubInstallationRequest } from './github-app'
-import { createServiceSupabaseClient } from './supabase'
+import { createServiceSupabaseClient } from '../lib/service-supabase'
+import { createServerError } from '../lib/errors'
 import { fingerprintOpenAIKey, loadUserOpenAIConfig } from './openai-settings'
 
 const maxIndexedFiles = 240
 const maxIndexedFileBytes = 140_000
 const maxIndexedTotalBytes = 6_000_000
-const activeIndexes = new Set<string>()
 
 type GithubConnection = {
   site_id: string
@@ -51,36 +51,16 @@ type IndexedFile = {
   content: string
 }
 
-export function startGithubRepositoryIndex(input: {
-  siteId: string
-  userId: string
-  event?: H3Event
-}) {
-  const key = `${input.userId}:${input.siteId}`
-  if (activeIndexes.has(key)) {
-    return
-  }
-
-  activeIndexes.add(key)
-  void indexGithubRepository(input)
-    .catch(async (error) => {
-      const client = createServiceSupabaseClient()
-      await markIndexFailed(client, input.userId, input.siteId, error)
-    })
-    .finally(() => {
-      activeIndexes.delete(key)
-    })
-}
-
 export async function indexGithubRepository(input: {
   siteId: string
   userId: string
   event?: H3Event
+  jobId?: string
 }) {
   const client = createServiceSupabaseClient(input.event)
   const connection = await loadIndexConnection(client, input.userId, input.siteId)
   if (!connection) {
-    throw createError({ statusCode: 404, statusMessage: 'GitHub connection not found' })
+    throw createServerError(404, 'GitHub connection not found')
   }
 
   const openaiConfig = await loadUserOpenAIConfig(client, input.userId, input.event)
@@ -88,14 +68,20 @@ export async function indexGithubRepository(input: {
   const openai = new OpenAI({ apiKey: openaiConfig.apiKey })
   const now = new Date().toISOString()
 
+  const indexingPatch: Record<string, string | null> = {
+    repository_index_status: 'indexing',
+    repository_index_started_at: now,
+    repository_index_error: null,
+    updated_at: now
+  }
+
+  if (input.jobId) {
+    indexingPatch.repository_index_job_id = input.jobId
+  }
+
   await client
     .from('site_github_connections')
-    .update({
-      repository_index_status: 'indexing',
-      repository_index_started_at: now,
-      repository_index_error: null,
-      updated_at: now
-    })
+    .update(indexingPatch)
     .eq('site_id', input.siteId)
     .eq('user_id', input.userId)
 
@@ -148,7 +134,7 @@ export async function indexGithubRepository(input: {
     const indexedFiles = files.filter(Boolean) as IndexedFile[]
 
     if (!indexedFiles.length) {
-      throw createError({ statusCode: 422, statusMessage: 'No eligible repository files were found to index' })
+      throw createServerError(422, 'No eligible repository files were found to index')
     }
 
     const vectorStore = await openai.vectorStores.create({
@@ -161,43 +147,72 @@ export async function indexGithubRepository(input: {
     })
     newVectorStoreId = vectorStore.id
 
-    for (const file of indexedFiles) {
+    const uploadedFiles = await mapLimit(indexedFiles, 6, async (file) => {
       const uploadedFile = await openai.files.create({
         file: new File([file.content], safeOpenAIFileName(file.path), { type: 'text/plain' }),
         purpose: 'assistants'
       })
 
-      await openai.vectorStores.files.create(vectorStore.id, {
-        file_id: uploadedFile.id,
+      return {
+        file,
+        fileId: uploadedFile.id
+      }
+    })
+
+    const batch = await openai.vectorStores.fileBatches.createAndPoll(vectorStore.id, {
+      files: uploadedFiles.map(({ file, fileId }) => ({
+        file_id: fileId,
         attributes: {
           path: file.path,
           branch,
           sha: file.sha
         }
-      })
+      }))
+    }, { pollIntervalMs: 1000 })
+
+    if (batch.status !== 'completed' || batch.file_counts.failed || batch.file_counts.cancelled) {
+      const failedCount = batch.file_counts.failed + batch.file_counts.cancelled
+      throw createServerError(502, `OpenAI could not index ${failedCount} repository files`)
     }
 
-    await waitForVectorStoreReady(openai, vectorStore.id)
-
     const indexedAt = new Date().toISOString()
-    const { error } = await client
+    const readyPatch = {
+      repository_vector_store_id: vectorStore.id,
+      repository_index_status: 'ready',
+      repository_indexed_branch: branch,
+      repository_indexed_sha: headSha,
+      repository_indexed_at: indexedAt,
+      repository_index_error: null,
+      repository_index_file_count: indexedFiles.length,
+      repository_index_openai_key_fingerprint: keyFingerprint,
+      updated_at: indexedAt
+    }
+    let readyQuery = client
       .from('site_github_connections')
-      .update({
-        repository_vector_store_id: vectorStore.id,
-        repository_index_status: 'ready',
-        repository_indexed_branch: branch,
-        repository_indexed_sha: headSha,
-        repository_indexed_at: indexedAt,
-        repository_index_error: null,
-        repository_index_file_count: indexedFiles.length,
-        repository_index_openai_key_fingerprint: keyFingerprint,
-        updated_at: indexedAt
-      })
+      .update(readyPatch)
       .eq('site_id', input.siteId)
       .eq('user_id', input.userId)
 
+    if (input.jobId) {
+      readyQuery = readyQuery.eq('repository_index_job_id', input.jobId)
+    }
+
+    const { data: updatedConnection, error } = await readyQuery
+      .select('site_id')
+      .maybeSingle()
+
     if (error) {
-      throw createError({ statusCode: 500, statusMessage: error.message })
+      throw createServerError(500, error.message)
+    }
+
+    if (!updatedConnection) {
+      await openai.vectorStores.delete(vectorStore.id).catch(() => undefined)
+      return {
+        stale: true,
+        vector_store_id: vectorStore.id,
+        file_count: indexedFiles.length,
+        indexed_sha: headSha
+      }
     }
 
     if (connection.repository_vector_store_id && connection.repository_vector_store_id !== vectorStore.id) {
@@ -205,6 +220,7 @@ export async function indexGithubRepository(input: {
     }
 
     return {
+      stale: false,
       vector_store_id: vectorStore.id,
       file_count: indexedFiles.length,
       indexed_sha: headSha
@@ -213,7 +229,9 @@ export async function indexGithubRepository(input: {
     if (newVectorStoreId) {
       await openai.vectorStores.delete(newVectorStoreId).catch(() => undefined)
     }
-    await markIndexFailed(client, input.userId, input.siteId, error)
+    if (!input.jobId) {
+      await markIndexFailed(client, input.userId, input.siteId, error)
+    }
     throw error
   }
 }
@@ -259,7 +277,7 @@ async function loadIndexConnection(client: SupabaseClient, userId: string, siteI
     .maybeSingle()
 
   if (error) {
-    throw createError({ statusCode: 500, statusMessage: error.message })
+    throw createServerError(500, error.message)
   }
 
   return data as GithubConnection | null
@@ -373,25 +391,6 @@ function isIndexablePath(path: string) {
 
 function looksBinary(value: string) {
   return value.includes('\u0000')
-}
-
-async function waitForVectorStoreReady(openai: OpenAI, vectorStoreId: string) {
-  for (let attempt = 0; attempt < 30; attempt++) {
-    const files = await openai.vectorStores.files.list(vectorStoreId)
-    const data = files.data || []
-    if (data.length && data.every(file => file.status === 'completed')) {
-      return
-    }
-
-    const failed = data.find(file => file.status === 'failed' || file.status === 'cancelled')
-    if (failed) {
-      throw createError({ statusCode: 502, statusMessage: `OpenAI could not index ${failed.id}` })
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 1000))
-  }
-
-  throw createError({ statusCode: 504, statusMessage: 'OpenAI vector store indexing timed out' })
 }
 
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>) {

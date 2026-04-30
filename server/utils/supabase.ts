@@ -1,7 +1,9 @@
 import type { H3Event } from 'h3'
 import { createServerClient } from '@supabase/ssr'
-import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js'
+import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { createError, getCookie, getHeader, parseCookies, setCookie } from 'h3'
+
+export { createServiceSupabaseClient } from '../lib/service-supabase'
 
 export function createEventSupabaseClient(event: H3Event) {
   const config = useRuntimeConfig(event)
@@ -33,25 +35,6 @@ export function createEventSupabaseClient(event: H3Event) {
       }
     }
   )
-}
-
-export function createServiceSupabaseClient(event?: H3Event) {
-  const config = event ? useRuntimeConfig(event) : useRuntimeConfig()
-  const serviceRoleKey = config.supabaseServiceRoleKey || process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!config.public.supabaseUrl || !serviceRoleKey) {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Supabase service role is not configured'
-    })
-  }
-
-  return createClient(config.public.supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  })
 }
 
 export async function requireUser(event: H3Event): Promise<User> {

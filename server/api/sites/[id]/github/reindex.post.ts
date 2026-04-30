@@ -1,7 +1,7 @@
 import { createError, getRouterParam } from 'h3'
 import { createServiceSupabaseClient, requireUser } from '../../../../utils/supabase'
 import { getSiteGithubConnection, getUserSite } from '../../../../utils/sites'
-import { startGithubRepositoryIndex } from '../../../../utils/github-index'
+import { enqueueGithubRepositoryIndex } from '../../../../utils/github-index-jobs'
 
 export default defineEventHandler(async (event) => {
   const user = await requireUser(event)
@@ -18,23 +18,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Repository context is disabled for this site' })
   }
 
-  const now = new Date().toISOString()
-  await client
-    .from('site_github_connections')
-    .update({
-      repository_index_status: 'indexing',
-      repository_index_started_at: now,
-      repository_index_error: null,
-      repository_index_file_count: 0,
-      updated_at: now
-    })
-    .eq('site_id', id)
-    .eq('user_id', user.id)
-
-  startGithubRepositoryIndex({ siteId: id, userId: user.id })
+  const jobId = await enqueueGithubRepositoryIndex(client, user.id, id)
 
   return {
     ok: true,
+    job_id: jobId,
     repository_index_status: 'indexing'
   }
 })
