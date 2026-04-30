@@ -77,7 +77,11 @@ export async function indexGithubRepository(input: {
     repository_index_status: 'indexing',
     repository_index_stage: 'preparing',
     repository_index_started_at: now,
+    repository_indexed_branch: null,
+    repository_indexed_sha: null,
+    repository_indexed_at: null,
     repository_index_error: null,
+    repository_index_file_count: 0,
     repository_index_processed_file_count: 0,
     repository_index_total_file_count: 0,
     updated_at: now
@@ -134,7 +138,6 @@ export async function indexGithubRepository(input: {
     })
 
     let fetchedCount = 0
-    let eligibleCount = 0
     const files = await mapLimit(candidates, 6, async (candidate) => {
       let indexedFile: IndexedFile | null = null
 
@@ -169,16 +172,11 @@ export async function indexGithubRepository(input: {
         return indexedFile
       } finally {
         fetchedCount += 1
-        if (indexedFile) {
-          eligibleCount += 1
-        }
-
         if (fetchedCount === candidates.length || fetchedCount % 20 === 0) {
           await updateIndexProgress(client, input, {
             stage: 'fetching',
             processedFileCount: fetchedCount,
-            totalFileCount: candidates.length,
-            fileCount: eligibleCount
+            totalFileCount: candidates.length
           })
         }
       }
@@ -192,8 +190,7 @@ export async function indexGithubRepository(input: {
     await updateIndexProgress(client, input, {
       stage: 'uploading',
       processedFileCount: 0,
-      totalFileCount: indexedFiles.length,
-      fileCount: indexedFiles.length
+      totalFileCount: indexedFiles.length
     })
 
     const vectorStore = await openai.vectorStores.create({
@@ -218,8 +215,7 @@ export async function indexGithubRepository(input: {
         await updateIndexProgress(client, input, {
           stage: 'uploading',
           processedFileCount: uploadedCount,
-          totalFileCount: indexedFiles.length,
-          fileCount: indexedFiles.length
+          totalFileCount: indexedFiles.length
         })
       }
 
@@ -231,12 +227,11 @@ export async function indexGithubRepository(input: {
 
     await updateIndexProgress(client, input, {
       stage: 'indexing',
-      processedFileCount: uploadedFiles.length,
-      totalFileCount: uploadedFiles.length,
-      fileCount: indexedFiles.length
+      processedFileCount: 0,
+      totalFileCount: uploadedFiles.length
     })
 
-    const batch = await openai.vectorStores.fileBatches.createAndPoll(vectorStore.id, {
+    const batch = await createFileBatchAndPollWithProgress(openai, client, input, vectorStore.id, {
       files: uploadedFiles.map(({ file, fileId }) => ({
         file_id: fileId,
         attributes: {
@@ -245,7 +240,7 @@ export async function indexGithubRepository(input: {
           sha: file.sha
         }
       }))
-    }, { pollIntervalMs: 1000 })
+    })
 
     if (batch.status !== 'completed' || batch.file_counts.failed || batch.file_counts.cancelled) {
       const failedCount = batch.file_counts.failed + batch.file_counts.cancelled
@@ -379,7 +374,6 @@ async function updateIndexProgress(
     stage: string
     processedFileCount: number
     totalFileCount: number
-    fileCount?: number
   }
 ) {
   const now = new Date().toISOString()
@@ -388,10 +382,6 @@ async function updateIndexProgress(
     repository_index_processed_file_count: progress.processedFileCount,
     repository_index_total_file_count: progress.totalFileCount,
     updated_at: now
-  }
-
-  if (typeof progress.fileCount === 'number') {
-    patch.repository_index_file_count = progress.fileCount
   }
 
   let query = client
@@ -409,6 +399,38 @@ async function updateIndexProgress(
   if (error) {
     throw createServerError(500, error.message)
   }
+}
+
+async function createFileBatchAndPollWithProgress(
+  openai: OpenAI,
+  client: SupabaseClient,
+  input: { siteId: string, userId: string, jobId?: string },
+  vectorStoreId: string,
+  body: {
+    files: Array<{
+      file_id: string
+      attributes: Record<string, string>
+    }>
+  }
+) {
+  let batch = await openai.vectorStores.fileBatches.create(vectorStoreId, body)
+  await updateIndexProgress(client, input, {
+    stage: 'indexing',
+    processedFileCount: batch.file_counts.completed + batch.file_counts.failed + batch.file_counts.cancelled,
+    totalFileCount: batch.file_counts.total || body.files.length
+  })
+
+  while (batch.status === 'in_progress') {
+    await sleep(2500)
+    batch = await openai.vectorStores.fileBatches.retrieve(batch.id, { vector_store_id: vectorStoreId })
+    await updateIndexProgress(client, input, {
+      stage: 'indexing',
+      processedFileCount: batch.file_counts.completed + batch.file_counts.failed + batch.file_counts.cancelled,
+      totalFileCount: batch.file_counts.total || body.files.length
+    })
+  }
+
+  return batch
 }
 
 function selectIndexCandidates(tree: NonNullable<GithubTreeResponse['tree']>) {
@@ -522,6 +544,10 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
 
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()))
   return results
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 function encodePath(path: string) {

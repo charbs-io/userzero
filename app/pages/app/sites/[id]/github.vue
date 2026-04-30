@@ -203,7 +203,7 @@ function indexProgressText(connection: NonNullable<Site['github_connection']>) {
     case 'uploading':
       return total ? `Uploading files ${processed}/${total}` : 'Uploading files'
     case 'indexing':
-      return total ? `Finalizing ${total} files` : 'Finalizing index'
+      return total ? `Finalizing index ${processed}/${total}` : 'Finalizing index'
     default:
       return 'Indexing repository'
   }
@@ -232,7 +232,7 @@ function indexProgressPercent(connection: NonNullable<Site['github_connection']>
     case 'uploading':
       return Math.max(40, Math.round(40 + ratio * 35))
     case 'indexing':
-      return 88
+      return Math.max(75, Math.round(75 + ratio * 20))
     default:
       return 18
   }
